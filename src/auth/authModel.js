@@ -21,6 +21,11 @@ const UserAuth = sequelize.define('auths', {
         allowNull: false,
         unique: true
     },
+    phoneNumber: {
+        type: DataTypes.STRING,
+        allowNull: false,
+        unique: true
+    },
     role: {
         type: DataTypes.ENUM('user', 'admin'),
         allowNull: false,
