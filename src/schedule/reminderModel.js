@@ -1,5 +1,5 @@
 import { DataTypes } from 'sequelize';
-import sequelize from '../../config/dbConfig.js';
+import sequelize from '../config/dbConfig.js';
 
 const Reminder = sequelize.define('Reminder', {
     id: {
