@@ -45,10 +45,11 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 // Middlewares
-app.use(cors({
-    origin: true, // Allow requests from any origin in development
-    credentials: true
-}));
+const corsOptions = {
+    origin: ['http://localhost:5173', 'https://yourproductionapp.com'], 
+    methods: ['GET', 'POST', 'PUT', 'DELETE'], 
+};
+app.use(cors(corsOptions));
 app.use(cookieParser());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
