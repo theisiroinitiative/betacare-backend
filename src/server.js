@@ -47,7 +47,8 @@ const __dirname = path.dirname(__filename);
 // Middlewares
 const corsOptions = {
     origin: ['http://localhost:5173', 'https://yourproductionapp.com'], 
-    methods: ['GET', 'POST', 'PUT', 'DELETE'], 
+    methods: ['GET', 'POST', 'PUT', 'DELETE'],
+    credentials: true
 };
 app.use(cors(corsOptions));
 app.use(cookieParser());
