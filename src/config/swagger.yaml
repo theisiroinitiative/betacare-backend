@@ -1,0 +1,1018 @@
+openapi: 3.0.0
+info:
+  title: BetaCare Integration & Authentication API
+  description: API Documentation for BetaCare user auth, hospital/organization integration, department onboarding, and practitioner management.
+  version: 1.0.0
+servers:
+  - url: http://localhost:5000
+    description: Local development server
+paths:
+  /auth/user/new:
+    post:
+      tags:
+        - User Authentication
+      summary: Stage 1 onboarding registration
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [firstname, lastname, email, password, phoneNumber]
+              properties:
+                firstname: { type: string, example: John }
+                lastname: { type: string, example: Doe }
+                email: { type: string, format: email, example: johndoe@example.com }
+                password: { type: string, format: password, minLength: 6, example: securepass123 }
+                phoneNumber: { type: string, example: "2348067651234" }
+      responses:
+        '201':
+          description: Registration successful, OTP sent.
+        '400':
+          description: Validation error.
+
+  /auth/user/verify:
+    put:
+      tags:
+        - User Authentication
+      summary: Verify email OTP code
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, otpcode]
+              properties:
+                email: { type: string, format: email, example: johndoe@example.com }
+                otpcode: { type: string, example: "123456" }
+      responses:
+        '200':
+          description: OTP verified successfully.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string, example: "Email verified successfully. Proceed to complete your health profile." }
+        '400':
+          description: Invalid or expired OTP.
+
+  /auth/user/profile/onboard:
+    post:
+      tags:
+        - User Authentication
+      summary: Complete Stage 2 Onboarding & Get WhatsApp Verification Code (Protected)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [firstName, lastName, gender, dateOfBirth, phoneNumber, bloodGroup, genotype, emergencyContactName, emergencyContactPhone, emergencyContactEmail]
+              properties:
+                firstName: { type: string, example: John }
+                lastName: { type: string, example: Doe }
+                gender: { type: string, enum: [male, female, other], example: male }
+                dateOfBirth: { type: string, format: date, example: "1990-01-01" }
+                phoneNumber: { type: string, example: "2348067651234" }
+                bloodGroup: { type: string, enum: [A+, A-, B+, B-, AB+, AB-, O+, O-], example: O+ }
+                genotype: { type: string, enum: [AA, AS, SS, AC, SC], example: AA }
+                emergencyContactName: { type: string, example: "Jane Doe" }
+                emergencyContactPhone: { type: string, example: "2348000000000" }
+                emergencyContactEmail: { type: string, format: email, example: jane@example.com }
+                medicalConditions:
+                  type: array
+                  items:
+                    type: object
+                    required: [conditionName, severity, diagnosedAt]
+                    properties:
+                      conditionName: { type: string, example: Asthma }
+                      severity: { type: string, enum: [mild, moderate, severe], example: mild }
+                      diagnosedAt: { type: string, format: date, example: "2015-06-01" }
+                      status: { type: string, enum: [active, inactive, remission], example: active }
+                medications:
+                  type: array
+                  items:
+                    type: object
+                    required: [name]
+                    properties:
+                      name: { type: string, example: Albuterol }
+                      dosage: { type: string, example: 90mcg }
+                      frequency: { type: string, example: As needed }
+                      startDate: { type: string, format: date, example: "2015-06-01" }
+                      endDate: { type: string, format: date }
+      responses:
+        '200':
+          description: Onboarding complete. WhatsApp code generated.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code: { type: string, example: XXXXXX-2348067651234 }
+                  message: { type: string, example: send the code to our whatsapp agent @ 2348000000000 }
+        '400':
+          description: Validation error or profile already onboarded.
+        '401':
+          description: Unauthorized. Missing or invalid access token.
+
+  /auth/user/profile:
+    get:
+      tags:
+        - Patient Profile CRUD
+      summary: Retrieve full patient health profile (demographics, conditions, medications, vitals, reminders, observations)
+      responses:
+        '200':
+          description: Profile retrieved successfully.
+        '401':
+          description: Unauthorized.
+    put:
+      tags:
+        - Patient Profile CRUD
+      summary: Update patient demographics and emergency contact details
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                firstName: { type: string }
+                lastName: { type: string }
+                emergencyContactName: { type: string }
+                emergencyContactPhone: { type: string }
+                emergencyContactEmail: { type: string }
+      responses:
+        '200':
+          description: Demographics updated successfully.
+
+  /auth/user/profile/link-practitioner:
+    post:
+      tags:
+        - Patient Profile CRUD
+      summary: Link a medical practitioner to user profile
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [practitionerId]
+              properties:
+                practitionerId: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Practitioner successfully linked.
+
+  /auth/user/profile/unlink-practitioner:
+    post:
+      tags:
+        - Patient Profile CRUD
+      summary: Unlink a medical practitioner from user profile
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [practitionerId]
+              properties:
+                practitionerId: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Practitioner successfully unlinked.
+
+  /auth/user/profile/conditions:
+    get:
+      tags:
+        - Patient Health Records
+      summary: Get user medical conditions list
+      responses:
+        '200':
+          description: Successfully fetched conditions.
+    post:
+      tags:
+        - Patient Health Records
+      summary: Add new medical condition to profile
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [conditionName, severity, diagnosedAt]
+              properties:
+                conditionName: { type: string }
+                severity: { type: string, enum: [mild, moderate, severe] }
+                diagnosedAt: { type: string, format: date }
+                status: { type: string, enum: [active, inactive, remission] }
+      responses:
+        '201':
+          description: Medical condition successfully added.
+
+  /auth/user/profile/conditions/{id}:
+    put:
+      tags:
+        - Patient Health Records
+      summary: Update medical condition severity/status
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                severity: { type: string, enum: [mild, moderate, severe] }
+                status: { type: string, enum: [active, inactive, remission] }
+      responses:
+        '200':
+          description: Condition updated successfully.
+    delete:
+      tags:
+        - Patient Health Records
+      summary: Delete medical condition from profile
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Condition deleted successfully.
+
+  /auth/user/profile/medications:
+    get:
+      tags:
+        - Patient Health Records
+      summary: Get user medications list
+      responses:
+        '200':
+          description: Successfully fetched medications.
+    post:
+      tags:
+        - Patient Health Records
+      summary: Add new medication to profile
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name: { type: string }
+                dosage: { type: string }
+                frequency: { type: string }
+                startDate: { type: string, format: date }
+                endDate: { type: string, format: date }
+      responses:
+        '201':
+          description: Medication successfully added.
+
+  /auth/user/profile/medications/{id}:
+    put:
+      tags:
+        - Patient Health Records
+      summary: Update medication details
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                dosage: { type: string }
+                frequency: { type: string }
+                endDate: { type: string, format: date }
+      responses:
+        '200':
+          description: Medication updated successfully.
+    delete:
+      tags:
+        - Patient Health Records
+      summary: Delete medication from profile
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Medication deleted successfully.
+
+  /auth/user/profile/vitals:
+    get:
+      tags:
+        - Patient Health Records
+      summary: Get vital logs
+      responses:
+        '200':
+          description: Successfully fetched vitals.
+    post:
+      tags:
+        - Patient Health Records
+      summary: Log new vital measurements manually
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                bmi: { type: number }
+                bloodPressureSystolic: { type: integer }
+                bloodPressureDiastolic: { type: integer }
+                bloodSugar: { type: number }
+                temperature: { type: number }
+                pulseRate: { type: integer }
+      responses:
+        '201':
+          description: Vital measurements logged successfully.
+
+  /auth/user/profile/medication-logs:
+    get:
+      tags:
+        - Patient Health Records
+      summary: Get medication logs
+      responses:
+        '200':
+          description: Successfully fetched logs.
+    post:
+      tags:
+        - Patient Health Records
+      summary: Log medication adherence/intake manually
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [medicationId]
+              properties:
+                medicationId: { type: string, format: uuid }
+                status: { type: string, enum: [taken, missed, skipped] }
+                notes: { type: string }
+      responses:
+        '201':
+          description: Medication intake logged successfully.
+
+  /auth/user/profile/observations:
+    get:
+      tags:
+        - Patient Health Records
+      summary: View AI observations recorded via bot
+      responses:
+        '200':
+          description: Successfully fetched observations.
+
+  /auth/user/profile/reminders:
+    get:
+      tags:
+        - Patient Health Records
+      summary: Get active reminders
+      responses:
+        '200':
+          description: Successfully fetched active reminders.
+
+  /auth/user/profile/reminders/{id}:
+    delete:
+      tags:
+        - Patient Health Records
+      summary: Cancel a reminder
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Reminder successfully cancelled.
+
+  /auth/user/login:
+    post:
+      tags:
+        - User Authentication
+      summary: User login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email: { type: string, format: email, example: johndoe@example.com }
+                password: { type: string, example: securepass123 }
+      responses:
+        '200':
+          description: Login successful. Cookies set.
+
+  /auth/user/renew-token:
+    get:
+      tags:
+        - User Authentication
+      summary: Renew user access token
+      responses:
+        '200':
+          description: Access token renewed.
+
+  /auth/user/logout:
+    put:
+      tags:
+        - User Authentication
+      summary: User logout
+      responses:
+        '200':
+          description: Logged out.
+
+  /auth/user/delete:
+    delete:
+      tags:
+        - User Authentication
+      summary: Delete user account (Protected)
+      responses:
+        '200':
+          description: Account deleted.
+
+  /organization/new:
+    post:
+      tags:
+        - Organization Management
+      summary: Register a new health centre/organization
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, type, ownership, email, description, phone, address, state, lga, registrationNumber]
+              properties:
+                name: { type: string, example: "City Hospital" }
+                type: { type: string, enum: [general_hospital, specialist_hospital, clinic, health_centre, maternity_home, diagnostic_centre], example: general_hospital }
+                ownership: { type: string, enum: [federal, state, private, ngo, faith_based], example: private }
+                email: { type: string, format: email, example: info@cityhospital.com }
+                phone: { type: string, example: "2348000000000" }
+                description: { type: string, example: "Full-service private healthcare facility." }
+                address: { type: string, example: "12 Hospital Rd, Ikeja" }
+                state: { type: string, example: "Lagos" }
+                lga: { type: string, example: "Ikeja" }
+                registrationNumber: { type: string, example: "CAC-123456" }
+      responses:
+        '201':
+          description: Organization created, pending admin approval.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string, example: "Your organization has been created, wait for approval" }
+
+  /organization/login:
+    post:
+      tags:
+        - Organization Management
+      summary: Organization login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [username, password]
+              properties:
+                username: { type: string, example: "city_hospital_admin" }
+                password: { type: string, example: "initialSecurePass" }
+      responses:
+        '200':
+          description: Login successful. Sets access_token and refresh_token cookies.
+
+  /organization/fetch:
+    get:
+      tags:
+        - Organization Management
+      summary: Fetch paginated organizations (Admin only)
+      parameters:
+        - name: page
+          in: query
+          schema: { type: integer }
+          example: 1
+        - name: status
+          in: query
+          schema: { type: string, enum: [pending, active, suspended] }
+        - name: type
+          in: query
+          schema: { type: string }
+        - name: state
+          in: query
+          schema: { type: string }
+        - name: ownership
+          in: query
+          schema: { type: string }
+        - name: dateJoined
+          in: query
+          schema: { type: string, format: date }
+      responses:
+        '200':
+          description: List of organizations.
+
+  /organization/update-status:
+    put:
+      tags:
+        - Organization Management
+      summary: Update organization status (Admin only)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [organization_id, status]
+              properties:
+                organization_id: { type: string, format: uuid }
+                status: { type: string, enum: [active, pending, suspended] }
+      responses:
+        '200':
+          description: Status updated successfully.
+
+  /organization/approve:
+    put:
+      tags:
+        - Organization Management
+      summary: Approve organization registration (Admin only)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [organization_id, username]
+              properties:
+                organization_id: { type: string, format: uuid }
+                username: { type: string, example: "city_hospital_admin" }
+      responses:
+        '200':
+          description: Organization approved, login details emailed.
+
+  /organization/summary:
+    get:
+      tags:
+        - Organization Management
+      summary: Get organization departments and practitioner count (Org manager only)
+      responses:
+        '200':
+          description: Summary data returned.
+
+  /organization/renew-token:
+    get:
+      tags:
+        - Organization Management
+      summary: Renew organization access token
+      responses:
+        '200':
+          description: Token renewed.
+
+  /organization/logout:
+    put:
+      tags:
+        - Organization Management
+      summary: Log out organization
+      responses:
+        '200':
+          description: Logged out successfully.
+
+  /organization/delete:
+    put:
+      tags:
+        - Organization Management
+      summary: Delete organization and cascade departments/practitioners (Org manager only)
+      responses:
+        '200':
+          description: Organization deleted.
+
+  /department/new:
+    post:
+      tags:
+        - Department Onboarding
+      summary: Register a new department under an organization (HOD only)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [departmentName, username, password, phone, description, email, organization_id]
+              properties:
+                departmentName: { type: string, example: "Pediatrics" }
+                username: { type: string, example: "peds_dept" }
+                password: { type: string, example: "peds_pass_123" }
+                phone: { type: string, example: "2348011111111" }
+                description: { type: string, example: "Department specializing in pediatric care." }
+                email: { type: string, format: email, example: peds@cityhospital.com }
+                organization_id: { type: string, format: uuid }
+      responses:
+        '201':
+          description: Department registered successfully.
+
+  /department/approve:
+    put:
+      tags:
+        - Department Onboarding
+      summary: Approve a registered department (Org only)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [department_id]
+              properties:
+                department_id: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Department approved.
+
+  /department/fetch:
+    get:
+      tags:
+        - Department Onboarding
+      summary: Fetch departments under the organization (Org only)
+      parameters:
+        - name: status
+          in: query
+          schema: { type: string, enum: [pending, approved] }
+        - name: dateJoined
+          in: query
+          schema: { type: string, format: date }
+      responses:
+        '200':
+          description: List of departments.
+
+  /department/delete:
+    delete:
+      tags:
+        - Department Onboarding
+      summary: Delete department and cascade practitioners (Org or HOD only)
+      parameters:
+        - name: department_id
+          in: query
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Department deleted.
+
+  /department/login:
+    post:
+      tags:
+        - Department Onboarding
+      summary: Department login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [username, password]
+              properties:
+                username: { type: string, example: "peds_dept" }
+                password: { type: string, example: "peds_pass_123" }
+      responses:
+        '200':
+          description: Login successful.
+
+  /department/renew-token:
+    get:
+      tags:
+        - Department Onboarding
+      summary: Renew department access token
+      responses:
+        '200':
+          description: Token renewed.
+
+  /department/logout:
+    put:
+      tags:
+        - Department Onboarding
+      summary: Log out department
+      responses:
+        '200':
+          description: Logged out successfully.
+
+  /practitioner/register:
+    post:
+      tags:
+        - Practitioner Management
+      summary: Register a practitioner
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [organization_id, job, staffId, email, phone, username, firstName, lastName, password]
+              properties:
+                organization_id: { type: string, format: uuid }
+                department_id: { type: string, format: uuid }
+                job: { type: string, enum: [doctor, nurse, lab_technician, pharmacist, hod] }
+                staffId: { type: string, example: "ST-098" }
+                mdcnNumber: { type: string, example: "MDCN-44321" }
+                firstName: { type: string, example: "Adewale" }
+                lastName: { type: string, example: "Alabi" }
+                password: { type: string, minLength: 6 }
+                email: { type: string, format: email, example: adewale.alabi@example.com }
+                phone: { type: string, example: "2348033333333" }
+                username: { type: string, example: "dr_adewale" }
+                specialization: { type: string, example: "Pediatric Surgery" }
+                qualification: { type: string, example: "MBBS, FWACS" }
+                employmentStatus: { type: string, enum: [full_time, part_time, locum, intern, volunteer] }
+                joinedAt: { type: string, format: date }
+      responses:
+        '201':
+          description: Practitioner registered successfully, HOD notified.
+
+  /practitioner/login:
+    post:
+      tags:
+        - Practitioner Management
+      summary: Practitioner login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [username, password]
+              properties:
+                username: { type: string, example: "dr_adewale" }
+                password: { type: string }
+      responses:
+        '200':
+          description: Login successful.
+
+  /practitioner/renew-token:
+    get:
+      tags:
+        - Practitioner Management
+      summary: Renew practitioner access token
+      responses:
+        '200':
+          description: Token renewed.
+
+  /practitioner/logout:
+    put:
+      tags:
+        - Practitioner Management
+      summary: Log out practitioner
+      responses:
+        '200':
+          description: Logged out successfully.
+
+  /practitioner/approve-practitioner:
+    put:
+      tags:
+        - Practitioner Management
+      summary: Approve practitioner registration (HOD only)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [practitioner_id]
+              properties:
+                practitioner_id: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Practitioner approved successfully.
+
+  /practitioner/reject-practitioner:
+    put:
+      tags:
+        - Practitioner Management
+      summary: Reject practitioner registration (HOD only)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [practitioner_id]
+              properties:
+                practitioner_id: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Practitioner rejected successfully.
+
+  /practitioner/fetch:
+    get:
+      tags:
+        - Practitioner Management
+      summary: Fetch practitioners under HOD's department (HOD only)
+      parameters:
+        - name: job
+          in: query
+          schema: { type: string }
+        - name: status
+          in: query
+          schema: { type: string }
+        - name: specialization
+          in: query
+          schema: { type: string }
+      responses:
+        '200':
+          description: List of practitioners.
+
+  /practitioner/delete:
+    delete:
+      tags:
+        - Practitioner Management
+      summary: Delete practitioner from department (HOD only, cannot delete HOD)
+      parameters:
+        - name: practitioner_id
+          in: query
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Practitioner deleted successfully.
+
+  /practitioner/patient/{phoneNumber}:
+    get:
+      tags:
+        - Practitioner Patient Portal
+      summary: Retrieve patient details by phone number (Practitioners only, requires patient linkage)
+      parameters:
+        - name: phoneNumber
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Patient profile retrieved successfully.
+        '403':
+          description: Access denied. Not linked to this patient.
+        '404':
+          description: Patient profile not found.
+
+  /practitioner/patient/{phoneNumber}/condition:
+    post:
+      tags:
+        - Practitioner Patient Portal
+      summary: Add medical condition to linked patient profile
+      parameters:
+        - name: phoneNumber
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [conditionName, severity, diagnosedAt]
+              properties:
+                conditionName: { type: string }
+                severity: { type: string, enum: [mild, moderate, severe] }
+                diagnosedAt: { type: string, format: date }
+      responses:
+        '201':
+          description: Condition successfully added by practitioner.
+
+  /practitioner/patient/{phoneNumber}/medication:
+    post:
+      tags:
+        - Practitioner Patient Portal
+      summary: Prescribe/add medication to linked patient profile
+      parameters:
+        - name: phoneNumber
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name: { type: string }
+                dosage: { type: string }
+                frequency: { type: string }
+                startDate: { type: string, format: date }
+                endDate: { type: string, format: date }
+      responses:
+        '201':
+          description: Medication successfully prescribed by practitioner.
+
+  /practitioner/patient/{phoneNumber}/medications:
+    get:
+      tags:
+        - Practitioner Patient Portal
+      summary: Get all medications of a linked patient
+      parameters:
+        - name: phoneNumber
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: List of medications retrieved successfully.
+
+  /practitioner/patient/{phoneNumber}/medication/{medicationId}:
+    put:
+      tags:
+        - Practitioner Patient Portal
+      summary: Update patient medication details
+      parameters:
+        - name: phoneNumber
+          in: path
+          required: true
+          schema: { type: string }
+        - name: medicationId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                dosage: { type: string }
+                frequency: { type: string }
+                endDate: { type: string, format: date }
+      responses:
+        '200':
+          description: Medication updated successfully.
+    delete:
+      tags:
+        - Practitioner Patient Portal
+      summary: Delete/cancel patient medication
+      parameters:
+        - name: phoneNumber
+          in: path
+          required: true
+          schema: { type: string }
+        - name: medicationId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Medication deleted successfully.
+
+  /practitioner/patient/{phoneNumber}/medication-logs:
+    get:
+      tags:
+        - Practitioner Patient Portal
+      summary: View medication intake logs of a linked patient
+      parameters:
+        - name: phoneNumber
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Medication logs retrieved successfully.
+
+  /practitioner/patient/{phoneNumber}/observations:
+    get:
+      tags:
+        - Practitioner Patient Portal
+      summary: View observations recorded by AI for a linked patient
+      parameters:
+        - name: phoneNumber
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Observations retrieved successfully.
+
+  /practitioner/patient/{phoneNumber}/vitals:
+    get:
+      tags:
+        - Practitioner Patient Portal
+      summary: View vital logs of a linked patient
+      parameters:
+        - name: phoneNumber
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Vitals retrieved successfully.
