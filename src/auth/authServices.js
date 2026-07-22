@@ -4,7 +4,7 @@ import Token from '../services/tokenServices/tokenModel.js';
 import otpService from '../services/otpServices/otpService.js';
 import { generateOTP } from '../services/otpServices/otp.js';
 import emailService from '../services/emailServices/emailService.js';
-import tokenService from '../services/dbServices/tokenServices.js';
+import tokenService from '../services/tokenServices/tokenServices.js';
 import {
     signAccessToken,
     signRefreshToken,
