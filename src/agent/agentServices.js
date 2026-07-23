@@ -8,7 +8,7 @@ import { usePostgresAuthState } from './agentModel.js';
 import redisClient from '../config/redisConfig.js';
 
 const makeWASocket = pkg.default || pkg;
-const { DisconnectReason } = pkg;
+const { DisconnectReason } = pkg.default || pkg;
 
 class WhatsAppBotService {
     constructor() {
