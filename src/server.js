@@ -1,5 +1,4 @@
 import express from 'express';
-import cors from 'cors';
 import cookieParser from 'cookie-parser';
 import dotenv from 'dotenv';
 import yaml from 'yamljs';
@@ -45,12 +44,6 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 // Middlewares
-const corsOptions = {
-    origin: ['http://localhost:5173', 'https://yourproductionapp.com'], 
-    methods: ['GET', 'POST', 'PUT', 'DELETE'],
-    credentials: true
-};
-app.use(cors(corsOptions));
 app.use(cookieParser());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));

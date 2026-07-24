@@ -1,4 +1,4 @@
-import pkg from '@whiskeysockets/baileys';
+import makeWASocket, { DisconnectReason } from '@whiskeysockets/baileys';
 import pino from 'pino';
 import bcrypt from 'bcryptjs';
 import UserAuth from '../auth/authModel.js';
@@ -6,9 +6,6 @@ import WhatsAppJidMapping from '../auth/whatsapp-auth/whatsappMappingModel.js';
 import { messageProcessor } from '../services/ai/ai-to-system-intepreter.js';
 import { usePostgresAuthState } from './agentModel.js';
 import redisClient from '../config/redisConfig.js';
-
-const makeWASocket = pkg.default || pkg;
-const { DisconnectReason } = pkg.default || pkg;
 
 class WhatsAppBotService {
     constructor() {
