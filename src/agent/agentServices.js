@@ -4,7 +4,7 @@ import bcrypt from 'bcryptjs';
 import UserAuth from '../auth/authModel.js';
 import WhatsAppJidMapping from '../auth/whatsapp-auth/whatsappMappingModel.js';
 import { messageProcessor } from '../services/ai/ai-to-system-intepreter.js';
-import { usePostgresAuthState } from './agentModel.js';
+import { usePostgresAuthState, WhatsAppSession } from './agentModel.js';
 import redisClient from '../config/redisConfig.js';
 
 class WhatsAppBotService {
@@ -48,6 +48,15 @@ class WhatsAppBotService {
 
                 if (shouldReconnect) {
                     setTimeout(() => this.connect(), 5000);
+                } else {
+                    console.log('Session logged out or invalid. Clearing session data and restarting...');
+                    try {
+                        await WhatsAppSession.destroy({ where: {} });
+                        console.log('Session data cleared from database.');
+                    } catch (err) {
+                        console.error('Failed to clear session data:', err.message);
+                    }
+                    setTimeout(() => this.init(), 5000);
                 }
             } else if (connection === 'open') {
                 console.log('WhatsApp bot is ready!');

@@ -2,7 +2,7 @@ import { DataTypes } from "sequelize";
 import sequelize from "../config/dbConfig.js";
 import { initAuthCreds, BufferJSON, proto } from "@whiskeysockets/baileys"
 
-const WhatsAppSession = sequelize.define('wpsession', {
+export const WhatsAppSession = sequelize.define('wpsession', {
     sessionId: { type: DataTypes.STRING, primaryKey: true },
     sessionData: DataTypes.BLOB('long')
 });
