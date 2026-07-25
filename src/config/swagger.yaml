@@ -1,107 +1,334 @@
 openapi: 3.0.0
 info:
   title: BetaCare Integration & Authentication API
-  description: API Documentation for BetaCare user auth, hospital/organization integration, department onboarding, and practitioner management.
+  description: API Documentation for BetaCare user auth, patient health profiles, hospital/organization integration, department onboarding, and practitioner management.
   version: 1.0.0
 servers:
   - url: http://localhost:5000
     description: Local development server
+
+security: []
+
 paths:
   /auth/user/new:
     post:
       tags:
         - User Authentication
       summary: Stage 1 onboarding registration
+      description: Register a new patient account. An email OTP will be sent to verify the email address.
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              type: object
-              required: [firstname, lastname, email, password, phoneNumber]
-              properties:
-                firstname: { type: string, example: John }
-                lastname: { type: string, example: Doe }
-                email: { type: string, format: email, example: johndoe@example.com }
-                password: { type: string, format: password, minLength: 6, example: securepass123 }
-                phoneNumber: { type: string, example: "2348067651234" }
+              $ref: '#/components/schemas/UserAuthRegister'
       responses:
         '201':
           description: Registration successful, OTP sent.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
         '400':
           description: Validation error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
 
   /auth/user/verify:
     put:
       tags:
         - User Authentication
       summary: Verify email OTP code
+      description: Verify the email address using the 6-digit OTP code sent during registration.
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              type: object
-              required: [email, otpcode]
-              properties:
-                email: { type: string, format: email, example: johndoe@example.com }
-                otpcode: { type: string, example: "123456" }
+              $ref: '#/components/schemas/VerifyOTP'
       responses:
         '200':
           description: OTP verified successfully.
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  message: { type: string, example: "Email verified successfully. Proceed to complete your health profile." }
+                $ref: '#/components/schemas/SuccessResponse'
         '400':
           description: Invalid or expired OTP.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
 
-  /auth/user/profile/onboard:
+  /auth/user/verify-account:
     post:
       tags:
         - User Authentication
-      summary: Complete Stage 2 Onboarding & Get WhatsApp Verification Code (Protected)
+      summary: Verify account to initiate forgot password flow
+      description: Request a password reset OTP code.
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              type: object
-              required: [firstName, lastName, gender, dateOfBirth, phoneNumber, bloodGroup, genotype, emergencyContactName, emergencyContactPhone, emergencyContactEmail]
-              properties:
-                firstName: { type: string, example: John }
-                lastName: { type: string, example: Doe }
-                gender: { type: string, enum: [male, female, other], example: male }
-                dateOfBirth: { type: string, format: date, example: "1990-01-01" }
-                phoneNumber: { type: string, example: "2348067651234" }
-                bloodGroup: { type: string, enum: [A+, A-, B+, B-, AB+, AB-, O+, O-], example: O+ }
-                genotype: { type: string, enum: [AA, AS, SS, AC, SC], example: AA }
-                emergencyContactName: { type: string, example: "Jane Doe" }
-                emergencyContactPhone: { type: string, example: "2348000000000" }
-                emergencyContactEmail: { type: string, format: email, example: jane@example.com }
-                medicalConditions:
-                  type: array
-                  items:
-                    type: object
-                    required: [conditionName, severity, diagnosedAt]
-                    properties:
-                      conditionName: { type: string, example: Asthma }
-                      severity: { type: string, enum: [mild, moderate, severe], example: mild }
-                      diagnosedAt: { type: string, format: date, example: "2015-06-01" }
-                      status: { type: string, enum: [active, inactive, remission], example: active }
-                medications:
-                  type: array
-                  items:
-                    type: object
-                    required: [name]
-                    properties:
-                      name: { type: string, example: Albuterol }
-                      dosage: { type: string, example: 90mcg }
-                      frequency: { type: string, example: As needed }
-                      startDate: { type: string, format: date, example: "2015-06-01" }
-                      endDate: { type: string, format: date }
+              $ref: '#/components/schemas/VerifyAccount'
+      responses:
+        '200':
+          description: Verification OTP sent successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+        '400':
+          description: Validation or account error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: User account not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /auth/user/verify-email:
+    post:
+      tags:
+        - User Authentication
+      summary: Verify OTP for password reset
+      description: Verify the reset OTP to receive a short-lived `password_reset_token` cookie.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VerifyOTP'
+      responses:
+        '200':
+          description: Email verified successfully. Sets `password_reset_token` cookie.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Email verified successfully. Proceed to reset password.
+          headers:
+            Set-Cookie:
+              schema:
+                type: string
+                example: password_reset_token=abc123xyz...; Path=/; HttpOnly; Secure; SameSite=None
+        '400':
+          description: Invalid or expired OTP.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /auth/user/password-reset:
+    put:
+      tags:
+        - User Authentication
+      summary: Reset user password
+      description: Set a new password for the user. Requires a valid `password_reset_token` cookie.
+      security:
+        - PasswordResetTokenAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PasswordReset'
+      responses:
+        '200':
+          description: Password reset successful. Clears the password reset cookie.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+        '400':
+          description: Validation error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized. Missing or invalid password reset token.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /auth/user/login:
+    post:
+      tags:
+        - User Authentication
+      summary: User login
+      description: Authenticate user using email and password. Sets `access_token` and `refresh_token` cookies.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserLogin'
+      responses:
+        '200':
+          description: Login successful. Cookies set.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+          headers:
+            Set-Cookie:
+              schema:
+                type: string
+                example: access_token=jwt_access_token...; Path=/; HttpOnly; Secure; SameSite=None
+        '400':
+          description: Validation error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Invalid email or password.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /auth/user/renew-token:
+    get:
+      tags:
+        - User Authentication
+      summary: Renew user access token
+      description: Renew `access_token` using the active `refresh_token` stored in cookies.
+      responses:
+        '200':
+          description: Access token renewed successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+          headers:
+            Set-Cookie:
+              schema:
+                type: string
+                example: access_token=new_jwt_access_token...; Path=/; HttpOnly; Secure; SameSite=None
+        '401':
+          description: Unauthorized. Missing or invalid refresh token.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /auth/user/logout:
+    put:
+      tags:
+        - User Authentication
+      summary: User logout
+      description: Log out the user and clear authorization cookies.
+      responses:
+        '200':
+          description: Logged out successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+        '500':
+          description: Internal server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /auth/user/delete:
+    delete:
+      tags:
+        - User Authentication
+      summary: Delete user account (Protected)
+      description: Permenantly delete patient auth record, profile, and associated history.
+      security:
+        - AccessTokenAuth: []
+      responses:
+        '200':
+          description: Account deleted successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+        '401':
+          description: Unauthorized. Invalid access token.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /auth/user/profile/onboard:
+    post:
+      tags:
+        - Patient Profile CRUD
+      summary: Complete Stage 2 Onboarding (Protected)
+      description: Create the detailed user health profile and generate a WhatsApp agent code.
+      security:
+        - AccessTokenAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserProfileOnboard'
       responses:
         '200':
           description: Onboarding complete. WhatsApp code generated.
@@ -110,117 +337,286 @@ paths:
               schema:
                 type: object
                 properties:
-                  code: { type: string, example: XXXXXX-2348067651234 }
-                  message: { type: string, example: send the code to our whatsapp agent @ 2348000000000 }
+                  code:
+                    type: string
+                    example: "XXXXXX-2348067651234"
+                  message:
+                    type: string
+                    example: "send the code to our whatsapp agent @ 2348000000000"
         '400':
           description: Validation error or profile already onboarded.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
         '401':
           description: Unauthorized. Missing or invalid access token.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
 
   /auth/user/profile:
     get:
       tags:
         - Patient Profile CRUD
-      summary: Retrieve full patient health profile (demographics, conditions, medications, vitals, reminders, observations)
+      summary: Retrieve full patient health profile
+      description: Retrieve demographics, medical conditions, medications, vitals, reminders, and observations.
+      security:
+        - AccessTokenAuth: []
       responses:
         '200':
           description: Profile retrieved successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserProfileResponse'
         '401':
-          description: Unauthorized.
+          description: Unauthorized. Missing or invalid access token.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Health profile not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
     put:
       tags:
         - Patient Profile CRUD
-      summary: Update patient demographics and emergency contact details
+      summary: Update patient demographics
+      description: Update patient demographics and emergency contact details.
+      security:
+        - AccessTokenAuth: []
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              type: object
-              properties:
-                firstName: { type: string }
-                lastName: { type: string }
-                emergencyContactName: { type: string }
-                emergencyContactPhone: { type: string }
-                emergencyContactEmail: { type: string }
+              $ref: '#/components/schemas/UserProfileUpdate'
       responses:
         '200':
           description: Demographics updated successfully.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Profile updated successfully.
+                  profile:
+                    $ref: '#/components/schemas/UserProfile'
+        '401':
+          description: Unauthorized.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
 
   /auth/user/profile/link-practitioner:
     post:
       tags:
         - Patient Profile CRUD
       summary: Link a medical practitioner to user profile
+      description: Link a practitioner ID to enable them to view and manage health records.
+      security:
+        - AccessTokenAuth: []
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              type: object
-              required: [practitionerId]
-              properties:
-                practitionerId: { type: string, format: uuid }
+              $ref: '#/components/schemas/LinkPractitioner'
       responses:
         '200':
           description: Practitioner successfully linked.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Practitioner linked successfully.
+                  profile:
+                    $ref: '#/components/schemas/UserProfile'
+        '400':
+          description: Validation or entity error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
 
   /auth/user/profile/unlink-practitioner:
     post:
       tags:
         - Patient Profile CRUD
       summary: Unlink a medical practitioner from user profile
+      description: Remove linking for a practitioner to revoke access to health records.
+      security:
+        - AccessTokenAuth: []
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              type: object
-              required: [practitionerId]
-              properties:
-                practitionerId: { type: string, format: uuid }
+              $ref: '#/components/schemas/LinkPractitioner'
       responses:
         '200':
           description: Practitioner successfully unlinked.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Practitioner unlinked successfully.
+                  profile:
+                    $ref: '#/components/schemas/UserProfile'
+        '400':
+          description: Validation error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
 
   /auth/user/profile/conditions:
     get:
       tags:
         - Patient Health Records
       summary: Get user medical conditions list
+      description: Retrieve all recorded medical conditions.
+      security:
+        - AccessTokenAuth: []
       responses:
         '200':
           description: Successfully fetched conditions.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Condition'
+        '401':
+          description: Unauthorized.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
     post:
       tags:
         - Patient Health Records
       summary: Add new medical condition to profile
+      description: Add a new medical condition record to patient profile.
+      security:
+        - AccessTokenAuth: []
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              type: object
-              required: [conditionName, severity, diagnosedAt]
-              properties:
-                conditionName: { type: string }
-                severity: { type: string, enum: [mild, moderate, severe] }
-                diagnosedAt: { type: string, format: date }
-                status: { type: string, enum: [active, inactive, remission] }
+              $ref: '#/components/schemas/ConditionInput'
       responses:
         '201':
           description: Medical condition successfully added.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Condition added successfully.
+                  condition:
+                    $ref: '#/components/schemas/Condition'
+        '400':
+          description: Validation error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
 
   /auth/user/profile/conditions/{id}:
     put:
       tags:
         - Patient Health Records
       summary: Update medical condition severity/status
+      description: Update severity and/or status of a medical condition record.
+      security:
+        - AccessTokenAuth: []
       parameters:
         - name: id
           in: path
           required: true
-          schema: { type: string, format: uuid }
+          description: The UUID of the condition record.
+          schema:
+            type: string
+            format: uuid
+            example: "9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d"
       requestBody:
         required: true
         content:
@@ -228,63 +624,184 @@ paths:
             schema:
               type: object
               properties:
-                severity: { type: string, enum: [mild, moderate, severe] }
-                status: { type: string, enum: [active, inactive, remission] }
+                severity:
+                  type: string
+                  enum: [mild, moderate, severe]
+                  example: moderate
+                status:
+                  type: string
+                  enum: [active, inactive, remission]
+                  example: remission
       responses:
         '200':
           description: Condition updated successfully.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Condition updated successfully.
+                  condition:
+                    $ref: '#/components/schemas/Condition'
+        '400':
+          description: Validation error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Condition record not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
     delete:
       tags:
         - Patient Health Records
       summary: Delete medical condition from profile
+      description: Permanently remove a medical condition record.
+      security:
+        - AccessTokenAuth: []
       parameters:
         - name: id
           in: path
           required: true
-          schema: { type: string, format: uuid }
+          description: The UUID of the condition record.
+          schema:
+            type: string
+            format: uuid
+            example: "9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d"
       responses:
         '200':
           description: Condition deleted successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+        '401':
+          description: Unauthorized.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Condition record not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
 
   /auth/user/profile/medications:
     get:
       tags:
         - Patient Health Records
       summary: Get user medications list
+      description: Retrieve all medications recorded on profile.
+      security:
+        - AccessTokenAuth: []
       responses:
         '200':
           description: Successfully fetched medications.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Medication'
+        '401':
+          description: Unauthorized.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
     post:
       tags:
         - Patient Health Records
       summary: Add new medication to profile
+      description: Record a new medication on the profile.
+      security:
+        - AccessTokenAuth: []
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              type: object
-              required: [name]
-              properties:
-                name: { type: string }
-                dosage: { type: string }
-                frequency: { type: string }
-                startDate: { type: string, format: date }
-                endDate: { type: string, format: date }
+              $ref: '#/components/schemas/MedicationInput'
       responses:
         '201':
           description: Medication successfully added.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Medication added successfully.
+                  medication:
+                    $ref: '#/components/schemas/Medication'
+        '400':
+          description: Validation error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
 
   /auth/user/profile/medications/{id}:
     put:
       tags:
         - Patient Health Records
       summary: Update medication details
+      description: Update dosage, frequency, and/or end date of an existing medication record.
+      security:
+        - AccessTokenAuth: []
       parameters:
         - name: id
           in: path
           required: true
-          schema: { type: string, format: uuid }
+          description: The UUID of the medication record.
+          schema:
+            type: string
+            format: uuid
+            example: "9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d"
       requestBody:
         required: true
         content:
@@ -292,391 +809,919 @@ paths:
             schema:
               type: object
               properties:
-                dosage: { type: string }
-                frequency: { type: string }
-                endDate: { type: string, format: date }
+                dosage:
+                  type: string
+                  example: 100mg
+                frequency:
+                  type: string
+                  example: Twice daily
+                endDate:
+                  type: string
+                  format: date
+                  example: "2026-08-30"
       responses:
         '200':
           description: Medication updated successfully.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Medication updated successfully.
+                  medication:
+                    $ref: '#/components/schemas/Medication'
+        '400':
+          description: Validation error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Medication record not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
     delete:
       tags:
         - Patient Health Records
       summary: Delete medication from profile
+      description: Permanently remove a medication record.
+      security:
+        - AccessTokenAuth: []
       parameters:
         - name: id
           in: path
           required: true
-          schema: { type: string, format: uuid }
+          description: The UUID of the medication record.
+          schema:
+            type: string
+            format: uuid
+            example: "9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d"
       responses:
         '200':
           description: Medication deleted successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+        '401':
+          description: Unauthorized.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Medication record not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
 
   /auth/user/profile/vitals:
     get:
       tags:
         - Patient Health Records
       summary: Get vital logs
+      description: Retrieve historical logged vital measurements.
+      security:
+        - AccessTokenAuth: []
       responses:
         '200':
           description: Successfully fetched vitals.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/VitalLog'
+        '401':
+          description: Unauthorized.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
     post:
       tags:
         - Patient Health Records
       summary: Log new vital measurements manually
+      description: Log stats such as BMI, blood pressure, blood sugar, temperature, or pulse.
+      security:
+        - AccessTokenAuth: []
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              type: object
-              properties:
-                bmi: { type: number }
-                bloodPressureSystolic: { type: integer }
-                bloodPressureDiastolic: { type: integer }
-                bloodSugar: { type: number }
-                temperature: { type: number }
-                pulseRate: { type: integer }
+              $ref: '#/components/schemas/VitalLogInput'
       responses:
         '201':
           description: Vital measurements logged successfully.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Vitals logged successfully.
+                  vital:
+                    $ref: '#/components/schemas/VitalLog'
+        '400':
+          description: Validation error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
 
   /auth/user/profile/medication-logs:
     get:
       tags:
         - Patient Health Records
       summary: Get medication logs
+      description: Retrieve adherence tracking history for medications.
+      security:
+        - AccessTokenAuth: []
       responses:
         '200':
           description: Successfully fetched logs.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/MedicationLog'
+        '401':
+          description: Unauthorized.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
     post:
       tags:
         - Patient Health Records
       summary: Log medication adherence/intake manually
+      description: Log whether a specific medication was taken, missed, or skipped.
+      security:
+        - AccessTokenAuth: []
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              type: object
-              required: [medicationId]
-              properties:
-                medicationId: { type: string, format: uuid }
-                status: { type: string, enum: [taken, missed, skipped] }
-                notes: { type: string }
+              $ref: '#/components/schemas/MedicationLogInput'
       responses:
         '201':
           description: Medication intake logged successfully.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Medication intake logged successfully.
+                  log:
+                    $ref: '#/components/schemas/MedicationLog'
+        '400':
+          description: Validation error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
 
   /auth/user/profile/observations:
     get:
       tags:
         - Patient Health Records
       summary: View AI observations recorded via bot
+      description: Retrieve automated symptom observations logged by the AI chat agent.
+      security:
+        - AccessTokenAuth: []
       responses:
         '200':
           description: Successfully fetched observations.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Observation'
+        '401':
+          description: Unauthorized.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
 
   /auth/user/profile/reminders:
     get:
       tags:
         - Patient Health Records
       summary: Get active reminders
+      description: Retrieve scheduled reminders for medication, appointments, exercise, etc.
+      security:
+        - AccessTokenAuth: []
       responses:
         '200':
           description: Successfully fetched active reminders.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Reminder'
+        '401':
+          description: Unauthorized.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
 
   /auth/user/profile/reminders/{id}:
     delete:
       tags:
         - Patient Health Records
       summary: Cancel a reminder
+      description: Permanently remove/cancel a scheduled reminder.
+      security:
+        - AccessTokenAuth: []
       parameters:
         - name: id
           in: path
           required: true
-          schema: { type: string, format: uuid }
+          description: The UUID of the reminder.
+          schema:
+            type: string
+            format: uuid
+            example: "9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d"
       responses:
         '200':
           description: Reminder successfully cancelled.
-
-  /auth/user/login:
-    post:
-      tags:
-        - User Authentication
-      summary: User login
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [email, password]
-              properties:
-                email: { type: string, format: email, example: johndoe@example.com }
-                password: { type: string, example: securepass123 }
-      responses:
-        '200':
-          description: Login successful. Cookies set.
-
-  /auth/user/renew-token:
-    get:
-      tags:
-        - User Authentication
-      summary: Renew user access token
-      responses:
-        '200':
-          description: Access token renewed.
-
-  /auth/user/logout:
-    put:
-      tags:
-        - User Authentication
-      summary: User logout
-      responses:
-        '200':
-          description: Logged out.
-
-  /auth/user/delete:
-    delete:
-      tags:
-        - User Authentication
-      summary: Delete user account (Protected)
-      responses:
-        '200':
-          description: Account deleted.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+        '401':
+          description: Unauthorized.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Reminder not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
 
   /organization/new:
     post:
       tags:
         - Organization Management
       summary: Register a new health centre/organization
+      description: Register an organization under a pending review state.
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              type: object
-              required: [name, type, ownership, email, description, phone, address, state, lga, registrationNumber]
-              properties:
-                name: { type: string, example: "City Hospital" }
-                type: { type: string, enum: [general_hospital, specialist_hospital, clinic, health_centre, maternity_home, diagnostic_centre], example: general_hospital }
-                ownership: { type: string, enum: [federal, state, private, ngo, faith_based], example: private }
-                email: { type: string, format: email, example: info@cityhospital.com }
-                phone: { type: string, example: "2348000000000" }
-                description: { type: string, example: "Full-service private healthcare facility." }
-                address: { type: string, example: "12 Hospital Rd, Ikeja" }
-                state: { type: string, example: "Lagos" }
-                lga: { type: string, example: "Ikeja" }
-                registrationNumber: { type: string, example: "CAC-123456" }
+              $ref: '#/components/schemas/OrganizationRegister'
       responses:
         '201':
           description: Organization created, pending admin approval.
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  message: { type: string, example: "Your organization has been created, wait for approval" }
+                $ref: '#/components/schemas/SuccessResponse'
+        '400':
+          description: Validation error or registration number already registered.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
 
   /organization/login:
     post:
       tags:
         - Organization Management
       summary: Organization login
+      description: Login to the organization dashboard. Sets `access_token` and `refresh_token` cookies.
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              type: object
-              required: [username, password]
-              properties:
-                username: { type: string, example: "city_hospital_admin" }
-                password: { type: string, example: "initialSecurePass" }
+              $ref: '#/components/schemas/OrganizationLogin'
       responses:
         '200':
           description: Login successful. Sets access_token and refresh_token cookies.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+        '400':
+          description: Validation error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Invalid username or password.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Login unauthorized because organization status is not active.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
 
   /organization/fetch:
     get:
       tags:
         - Organization Management
       summary: Fetch paginated organizations (Admin only)
+      description: Retrieve a paginated list of registered organizations with filtering.
+      security:
+        - AccessTokenAuth: []
       parameters:
         - name: page
           in: query
-          schema: { type: integer }
-          example: 1
+          required: false
+          description: Page number for pagination (defaults to 1).
+          schema:
+            type: integer
+            example: 1
         - name: status
           in: query
-          schema: { type: string, enum: [pending, active, suspended] }
+          required: false
+          schema:
+            type: string
+            enum: [pending, active, suspended]
         - name: type
           in: query
-          schema: { type: string }
+          required: false
+          schema:
+            type: string
         - name: state
           in: query
-          schema: { type: string }
+          required: false
+          schema:
+            type: string
         - name: ownership
           in: query
-          schema: { type: string }
+          required: false
+          schema:
+            type: string
         - name: dateJoined
           in: query
-          schema: { type: string, format: date }
+          required: false
+          description: Filters organizations joined on or after this date.
+          schema:
+            type: string
+            format: date
       responses:
         '200':
-          description: List of organizations.
+          description: List of organizations retrieved.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  organizations:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Organization'
+                  total:
+                    type: integer
+                    example: 25
+                  pages:
+                    type: integer
+                    example: 3
+                  currentPage:
+                    type: integer
+                    example: 1
+        '401':
+          description: Unauthorized.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden. Administrator privileges required.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
 
   /organization/update-status:
     put:
       tags:
         - Organization Management
       summary: Update organization status (Admin only)
+      description: Update an organization's state (active, pending, suspended).
+      security:
+        - AccessTokenAuth: []
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              type: object
-              required: [organization_id, status]
-              properties:
-                organization_id: { type: string, format: uuid }
-                status: { type: string, enum: [active, pending, suspended] }
+              $ref: '#/components/schemas/OrganizationUpdateStatus'
       responses:
         '200':
           description: Status updated successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+        '401':
+          description: Unauthorized.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden. Administrator privileges required.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Organization not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
 
   /organization/approve:
     put:
       tags:
         - Organization Management
       summary: Approve organization registration (Admin only)
+      description: Approve a pending organization, assign an admin username, and email them a generated password.
+      security:
+        - AccessTokenAuth: []
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              type: object
-              required: [organization_id, username]
-              properties:
-                organization_id: { type: string, format: uuid }
-                username: { type: string, example: "city_hospital_admin" }
+              $ref: '#/components/schemas/OrganizationApprove'
       responses:
         '200':
           description: Organization approved, login details emailed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+        '400':
+          description: Username is already taken.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden. Administrator privileges required.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Organization not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
 
   /organization/summary:
     get:
       tags:
         - Organization Management
       summary: Get organization departments and practitioner count (Org manager only)
+      description: Retrieve dashboard summary for the authenticated organization.
+      security:
+        - AccessTokenAuth: []
+      parameters:
+        - name: organization_id
+          in: query
+          required: false
+          description: The UUID of the organization (defaults to authenticated organization).
+          schema:
+            type: string
+            format: uuid
       responses:
         '200':
           description: Summary data returned.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrganizationSummary'
+        '401':
+          description: Unauthorized.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden. Access denied. You can only query your own organization.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
 
   /organization/renew-token:
     get:
       tags:
         - Organization Management
       summary: Renew organization access token
+      description: Renew organization `access_token` using the cookie `refresh_token`.
       responses:
         '200':
-          description: Token renewed.
+          description: Token renewed successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+          headers:
+            Set-Cookie:
+              schema:
+                type: string
+                example: access_token=new_jwt_access_token...; Path=/; HttpOnly; Secure; SameSite=None
+        '401':
+          description: Unauthorized. Missing or invalid refresh token.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
 
   /organization/logout:
     put:
       tags:
         - Organization Management
       summary: Log out organization
+      description: Log out the organization and clear authorization cookies.
       responses:
         '200':
           description: Logged out successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+        '500':
+          description: Internal server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
 
   /organization/delete:
     put:
       tags:
         - Organization Management
       summary: Delete organization and cascade departments/practitioners (Org manager only)
+      description: Delete organization account permanently. Cascade deletes departments and practitioners.
+      security:
+        - AccessTokenAuth: []
       responses:
         '200':
-          description: Organization deleted.
+          description: Organization deleted successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+        '401':
+          description: Unauthorized.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden. Organization credentials required.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
 
   /department/new:
     post:
       tags:
         - Department Onboarding
       summary: Register a new department under an organization (HOD only)
+      description: Register a new department. HOD credentials are required.
+      security:
+        - AccessTokenAuth: []
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              type: object
-              required: [departmentName, username, password, phone, description, email, organization_id]
-              properties:
-                departmentName: { type: string, example: "Pediatrics" }
-                username: { type: string, example: "peds_dept" }
-                password: { type: string, example: "peds_pass_123" }
-                phone: { type: string, example: "2348011111111" }
-                description: { type: string, example: "Department specializing in pediatric care." }
-                email: { type: string, format: email, example: peds@cityhospital.com }
-                organization_id: { type: string, format: uuid }
+              $ref: '#/components/schemas/DepartmentRegister'
       responses:
         '201':
           description: Department registered successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+        '400':
+          description: Validation error or department username already taken.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden. Approved Head of Department (HOD) credentials required.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
 
   /department/approve:
     put:
       tags:
         - Department Onboarding
       summary: Approve a registered department (Org only)
+      description: Approve a pending department. Organization credentials required.
+      security:
+        - AccessTokenAuth: []
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              type: object
-              required: [department_id]
-              properties:
-                department_id: { type: string, format: uuid }
+              $ref: '#/components/schemas/DepartmentApprove'
       responses:
         '200':
-          description: Department approved.
+          description: Department approved successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+        '401':
+          description: Unauthorized.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden. Active organization credentials required.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Department not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
 
   /department/fetch:
     get:
       tags:
         - Department Onboarding
       summary: Fetch departments under the organization (Org only)
+      description: Retrieve departments belonging to the authenticated organization.
+      security:
+        - AccessTokenAuth: []
       parameters:
         - name: status
           in: query
-          schema: { type: string, enum: [pending, approved] }
+          required: false
+          schema:
+            type: string
+            enum: [pending, approved]
         - name: dateJoined
           in: query
-          schema: { type: string, format: date }
+          required: false
+          schema:
+            type: string
+            format: date
       responses:
         '200':
           description: List of departments.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Department'
+        '401':
+          description: Unauthorized.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden. Active organization credentials required.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
 
   /department/delete:
     delete:
       tags:
         - Department Onboarding
       summary: Delete department and cascade practitioners (Org or HOD only)
+      description: Delete department permanently. Cascade deletes practitioners.
+      security:
+        - AccessTokenAuth: []
       parameters:
         - name: department_id
           in: query
           required: true
-          schema: { type: string, format: uuid }
+          schema:
+            type: string
+            format: uuid
       responses:
         '200':
-          description: Department deleted.
+          description: Department deleted successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+        '401':
+          description: Unauthorized.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden. Access denied.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
 
   /department/login:
     post:
       tags:
         - Department Onboarding
       summary: Department login
+      description: Authenticate a department user. Sets `access_token` and `refresh_token` cookies.
       requestBody:
         required: true
         content:
@@ -685,104 +1730,208 @@ paths:
               type: object
               required: [username, password]
               properties:
-                username: { type: string, example: "peds_dept" }
-                password: { type: string, example: "peds_pass_123" }
+                username:
+                  type: string
+                  example: peds_dept
+                password:
+                  type: string
+                  example: peds_pass_123
       responses:
         '200':
           description: Login successful.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+        '401':
+          description: Invalid username or password.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Department is not approved or is inactive.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
 
   /department/renew-token:
     get:
       tags:
         - Department Onboarding
       summary: Renew department access token
+      description: Renew access token using the refresh token stored in cookies.
       responses:
         '200':
-          description: Token renewed.
+          description: Token renewed successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+        '401':
+          description: Unauthorized. Missing or invalid refresh token.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
 
   /department/logout:
     put:
       tags:
         - Department Onboarding
       summary: Log out department
+      description: Log out department and clear tokens.
       responses:
         '200':
           description: Logged out successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+        '500':
+          description: Internal server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
 
   /practitioner/register:
     post:
       tags:
         - Practitioner Management
       summary: Register a practitioner
+      description: Register a new medical practitioner. Pends HOD review.
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              type: object
-              required: [organization_id, job, staffId, email, phone, username, firstName, lastName, password]
-              properties:
-                organization_id: { type: string, format: uuid }
-                department_id: { type: string, format: uuid }
-                job: { type: string, enum: [doctor, nurse, lab_technician, pharmacist, hod] }
-                staffId: { type: string, example: "ST-098" }
-                mdcnNumber: { type: string, example: "MDCN-44321" }
-                firstName: { type: string, example: "Adewale" }
-                lastName: { type: string, example: "Alabi" }
-                password: { type: string, minLength: 6 }
-                email: { type: string, format: email, example: adewale.alabi@example.com }
-                phone: { type: string, example: "2348033333333" }
-                username: { type: string, example: "dr_adewale" }
-                specialization: { type: string, example: "Pediatric Surgery" }
-                qualification: { type: string, example: "MBBS, FWACS" }
-                employmentStatus: { type: string, enum: [full_time, part_time, locum, intern, volunteer] }
-                joinedAt: { type: string, format: date }
+              $ref: '#/components/schemas/PractitionerRegister'
       responses:
         '201':
           description: Practitioner registered successfully, HOD notified.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+        '400':
+          description: Validation error or username already taken.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
 
   /practitioner/login:
     post:
       tags:
         - Practitioner Management
       summary: Practitioner login
+      description: Authenticate practitioner. Sets `access_token` and `refresh_token` cookies.
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              type: object
-              required: [username, password]
-              properties:
-                username: { type: string, example: "dr_adewale" }
-                password: { type: string }
+              $ref: '#/components/schemas/PractitionerLogin'
       responses:
         '200':
-          description: Login successful.
+          description: Login successful. Sets cookies.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+        '401':
+          description: Invalid username or password.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Account is pending approval or inactive.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
 
   /practitioner/renew-token:
     get:
       tags:
         - Practitioner Management
       summary: Renew practitioner access token
+      description: Renew practitioner `access_token` using cookie `refresh_token`.
       responses:
         '200':
-          description: Token renewed.
+          description: Token renewed successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+        '401':
+          description: Unauthorized. Missing or invalid refresh token.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
 
   /practitioner/logout:
     put:
       tags:
         - Practitioner Management
       summary: Log out practitioner
+      description: Log out practitioner and clear cookies.
       responses:
         '200':
           description: Logged out successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+        '500':
+          description: Internal server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
 
   /practitioner/approve-practitioner:
     put:
       tags:
         - Practitioner Management
       summary: Approve practitioner registration (HOD only)
+      description: HOD approves a pending practitioner under their department.
+      security:
+        - AccessTokenAuth: []
       requestBody:
         required: true
         content:
@@ -791,16 +1940,50 @@ paths:
               type: object
               required: [practitioner_id]
               properties:
-                practitioner_id: { type: string, format: uuid }
+                practitioner_id:
+                  type: string
+                  format: uuid
+                  example: "9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d"
       responses:
         '200':
           description: Practitioner approved successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+        '401':
+          description: Unauthorized.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden. HOD privileges required.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Practitioner not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
 
   /practitioner/reject-practitioner:
     put:
       tags:
         - Practitioner Management
       summary: Reject practitioner registration (HOD only)
+      description: HOD rejects a pending practitioner registration.
+      security:
+        - AccessTokenAuth: []
       requestBody:
         required: true
         content:
@@ -809,142 +1992,396 @@ paths:
               type: object
               required: [practitioner_id]
               properties:
-                practitioner_id: { type: string, format: uuid }
+                practitioner_id:
+                  type: string
+                  format: uuid
+                  example: "9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d"
       responses:
         '200':
           description: Practitioner rejected successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+        '401':
+          description: Unauthorized.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden. HOD privileges required.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Practitioner not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
 
   /practitioner/fetch:
     get:
       tags:
         - Practitioner Management
       summary: Fetch practitioners under HOD's department (HOD only)
+      description: Retrieve a list of practitioners in the same department as the HOD.
+      security:
+        - AccessTokenAuth: []
       parameters:
         - name: job
           in: query
-          schema: { type: string }
+          required: false
+          schema:
+            type: string
         - name: status
           in: query
-          schema: { type: string }
+          required: false
+          schema:
+            type: string
+            enum: [pending, approved, rejected]
         - name: specialization
           in: query
-          schema: { type: string }
+          required: false
+          schema:
+            type: string
       responses:
         '200':
           description: List of practitioners.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Practitioner'
+        '401':
+          description: Unauthorized.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden. HOD credentials required.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
 
   /practitioner/delete:
     delete:
       tags:
         - Practitioner Management
       summary: Delete practitioner from department (HOD only, cannot delete HOD)
+      description: HOD deletes a practitioner record under their department.
+      security:
+        - AccessTokenAuth: []
       parameters:
         - name: practitioner_id
           in: query
           required: true
-          schema: { type: string, format: uuid }
+          schema:
+            type: string
+            format: uuid
       responses:
         '200':
           description: Practitioner deleted successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+        '400':
+          description: HOD cannot delete themselves.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden. HOD privileges required.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
 
   /practitioner/patient/{phoneNumber}:
     get:
       tags:
         - Practitioner Patient Portal
-      summary: Retrieve patient details by phone number (Practitioners only, requires patient linkage)
+      summary: Retrieve patient details by phone number (Practitioners only)
+      description: Retrieve patient demographic and health details. Patient must have linked this practitioner.
+      security:
+        - AccessTokenAuth: []
       parameters:
         - name: phoneNumber
           in: path
           required: true
-          schema: { type: string }
+          description: The phone number of the patient.
+          schema:
+            type: string
+            example: "2348067651234"
       responses:
         '200':
           description: Patient profile retrieved successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserProfileResponse'
+        '401':
+          description: Unauthorized.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
         '403':
-          description: Access denied. Not linked to this patient.
+          description: Access denied. Practitioner is not linked to this patient.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
         '404':
           description: Patient profile not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
 
   /practitioner/patient/{phoneNumber}/condition:
     post:
       tags:
         - Practitioner Patient Portal
-      summary: Add medical condition to linked patient profile
+      summary: Add medical condition to linked patient profile (Practitioners only)
+      description: Record a new medical condition on behalf of a linked patient.
+      security:
+        - AccessTokenAuth: []
       parameters:
         - name: phoneNumber
           in: path
           required: true
-          schema: { type: string }
+          description: The phone number of the patient.
+          schema:
+            type: string
+            example: "2348067651234"
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              type: object
-              required: [conditionName, severity, diagnosedAt]
-              properties:
-                conditionName: { type: string }
-                severity: { type: string, enum: [mild, moderate, severe] }
-                diagnosedAt: { type: string, format: date }
+              $ref: '#/components/schemas/ConditionInput'
       responses:
         '201':
           description: Condition successfully added by practitioner.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Condition added successfully.
+                  condition:
+                    $ref: '#/components/schemas/Condition'
+        '400':
+          description: Validation error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Access denied. Not linked to this patient.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Patient profile not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
 
   /practitioner/patient/{phoneNumber}/medication:
     post:
       tags:
         - Practitioner Patient Portal
-      summary: Prescribe/add medication to linked patient profile
+      summary: Prescribe/add medication to linked patient profile (Practitioners only)
+      description: Record a new prescription on behalf of a linked patient.
+      security:
+        - AccessTokenAuth: []
       parameters:
         - name: phoneNumber
           in: path
           required: true
-          schema: { type: string }
+          description: The phone number of the patient.
+          schema:
+            type: string
+            example: "2348067651234"
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              type: object
-              required: [name]
-              properties:
-                name: { type: string }
-                dosage: { type: string }
-                frequency: { type: string }
-                startDate: { type: string, format: date }
-                endDate: { type: string, format: date }
+              $ref: '#/components/schemas/MedicationInput'
       responses:
         '201':
           description: Medication successfully prescribed by practitioner.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Medication added successfully.
+                  medication:
+                    $ref: '#/components/schemas/Medication'
+        '400':
+          description: Validation error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Access denied. Not linked to this patient.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Patient profile not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
 
   /practitioner/patient/{phoneNumber}/medications:
     get:
       tags:
         - Practitioner Patient Portal
-      summary: Get all medications of a linked patient
+      summary: Get all medications of a linked patient (Practitioners only)
+      description: Retrieve recorded medications for a linked patient.
+      security:
+        - AccessTokenAuth: []
       parameters:
         - name: phoneNumber
           in: path
           required: true
-          schema: { type: string }
+          description: The phone number of the patient.
+          schema:
+            type: string
+            example: "2348067651234"
       responses:
         '200':
           description: List of medications retrieved successfully.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Medication'
+        '401':
+          description: Unauthorized.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Access denied. Not linked to this patient.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Patient profile not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
 
   /practitioner/patient/{phoneNumber}/medication/{medicationId}:
     put:
       tags:
         - Practitioner Patient Portal
-      summary: Update patient medication details
+      summary: Update patient medication details (Practitioners only)
+      description: Update dosage, frequency, and/or end date of a linked patient's medication.
+      security:
+        - AccessTokenAuth: []
       parameters:
         - name: phoneNumber
           in: path
           required: true
-          schema: { type: string }
+          description: The phone number of the patient.
+          schema:
+            type: string
+            example: "2348067651234"
         - name: medicationId
           in: path
           required: true
-          schema: { type: string, format: uuid }
+          description: The UUID of the medication.
+          schema:
+            type: string
+            format: uuid
+            example: "9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d"
       requestBody:
         required: true
         content:
@@ -952,67 +2389,1166 @@ paths:
             schema:
               type: object
               properties:
-                dosage: { type: string }
-                frequency: { type: string }
-                endDate: { type: string, format: date }
+                dosage:
+                  type: string
+                  example: 100mg
+                frequency:
+                  type: string
+                  example: Twice daily
+                endDate:
+                  type: string
+                  format: date
+                  example: "2026-08-30"
       responses:
         '200':
           description: Medication updated successfully.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Medication updated successfully.
+                  medication:
+                    $ref: '#/components/schemas/Medication'
+        '400':
+          description: Validation error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Access denied. Not linked to this patient.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Patient profile or medication record not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
     delete:
       tags:
         - Practitioner Patient Portal
-      summary: Delete/cancel patient medication
+      summary: Delete/cancel patient medication (Practitioners only)
+      description: Delete medication record of a linked patient.
+      security:
+        - AccessTokenAuth: []
       parameters:
         - name: phoneNumber
           in: path
           required: true
-          schema: { type: string }
+          description: The phone number of the patient.
+          schema:
+            type: string
+            example: "2348067651234"
         - name: medicationId
           in: path
           required: true
-          schema: { type: string, format: uuid }
+          description: The UUID of the medication.
+          schema:
+            type: string
+            format: uuid
+            example: "9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d"
       responses:
         '200':
           description: Medication deleted successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+        '401':
+          description: Unauthorized.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Access denied. Not linked to this patient.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Patient profile or medication record not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
 
   /practitioner/patient/{phoneNumber}/medication-logs:
     get:
       tags:
         - Practitioner Patient Portal
-      summary: View medication intake logs of a linked patient
+      summary: View medication intake logs of a linked patient (Practitioners only)
+      description: Retrieve medication intake logs for a linked patient.
+      security:
+        - AccessTokenAuth: []
       parameters:
         - name: phoneNumber
           in: path
           required: true
-          schema: { type: string }
+          description: The phone number of the patient.
+          schema:
+            type: string
+            example: "2348067651234"
       responses:
         '200':
           description: Medication logs retrieved successfully.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/MedicationLog'
+        '401':
+          description: Unauthorized.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Access denied. Not linked to this patient.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Patient profile not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
 
   /practitioner/patient/{phoneNumber}/observations:
     get:
       tags:
         - Practitioner Patient Portal
-      summary: View observations recorded by AI for a linked patient
+      summary: View observations recorded by AI for a linked patient (Practitioners only)
+      description: Retrieve AI system-logged health observations for a linked patient.
+      security:
+        - AccessTokenAuth: []
       parameters:
         - name: phoneNumber
           in: path
           required: true
-          schema: { type: string }
+          description: The phone number of the patient.
+          schema:
+            type: string
+            example: "2348067651234"
       responses:
         '200':
           description: Observations retrieved successfully.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Observation'
+        '401':
+          description: Unauthorized.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Access denied. Not linked to this patient.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Patient profile not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
 
   /practitioner/patient/{phoneNumber}/vitals:
     get:
       tags:
         - Practitioner Patient Portal
-      summary: View vital logs of a linked patient
+      summary: View vital logs of a linked patient (Practitioners only)
+      description: Retrieve historical vital measurements logged by a linked patient.
+      security:
+        - AccessTokenAuth: []
       parameters:
         - name: phoneNumber
           in: path
           required: true
-          schema: { type: string }
+          description: The phone number of the patient.
+          schema:
+            type: string
+            example: "2348067651234"
       responses:
         '200':
           description: Vitals retrieved successfully.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/VitalLog'
+        '401':
+          description: Unauthorized.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Access denied. Not linked to this patient.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Patient profile not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+components:
+  securitySchemes:
+    AccessTokenAuth:
+      type: apiKey
+      in: cookie
+      name: access_token
+      description: Access JWT token required for user, practitioner, organization, department, and admin protected operations.
+    PasswordResetTokenAuth:
+      type: apiKey
+      in: cookie
+      name: password_reset_token
+      description: Password reset verification JWT token. Required for the final password reset request.
+
+  schemas:
+    UserAuthRegister:
+      type: object
+      required: [firstname, lastname, email, password, phoneNumber]
+      properties:
+        firstname:
+          type: string
+          example: John
+        lastname:
+          type: string
+          example: Doe
+        email:
+          type: string
+          format: email
+          example: johndoe@example.com
+        password:
+          type: string
+          format: password
+          minLength: 6
+          example: securepass123
+        phoneNumber:
+          type: string
+          example: "2348067651234"
+
+    VerifyOTP:
+      type: object
+      required: [email, otpcode]
+      properties:
+        email:
+          type: string
+          format: email
+          example: johndoe@example.com
+        otpcode:
+          type: string
+          example: "123456"
+
+    VerifyAccount:
+      type: object
+      required: [email]
+      properties:
+        email:
+          type: string
+          format: email
+          example: johndoe@example.com
+
+    PasswordReset:
+      type: object
+      required: [newpassword]
+      properties:
+        newpassword:
+          type: string
+          format: password
+          minLength: 6
+          example: newSecurePass123
+
+    UserLogin:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+          example: johndoe@example.com
+        password:
+          type: string
+          format: password
+          example: securepass123
+
+    UserProfileOnboard:
+      type: object
+      required:
+        - firstName
+        - lastName
+        - gender
+        - dateOfBirth
+        - phoneNumber
+        - bloodGroup
+        - genotype
+        - emergencyContactName
+        - emergencyContactPhone
+        - emergencyContactEmail
+      properties:
+        firstName:
+          type: string
+          example: John
+        lastName:
+          type: string
+          example: Doe
+        gender:
+          type: string
+          enum: [male, female, other]
+          example: male
+        dateOfBirth:
+          type: string
+          format: date
+          example: "1990-01-01"
+        phoneNumber:
+          type: string
+          example: "2348067651234"
+        bloodGroup:
+          type: string
+          enum: [A+, A-, B+, B-, AB+, AB-, O+, O-]
+          example: O+
+        genotype:
+          type: string
+          enum: [AA, AS, SS, AC, SC]
+          example: AA
+        emergencyContactName:
+          type: string
+          example: "Jane Doe"
+        emergencyContactPhone:
+          type: string
+          example: "2348000000000"
+        emergencyContactEmail:
+          type: string
+          format: email
+          example: jane@example.com
+        medicalConditions:
+          type: array
+          items:
+            $ref: '#/components/schemas/ConditionInput'
+        medications:
+          type: array
+          items:
+            $ref: '#/components/schemas/MedicationInput'
+
+    UserProfileUpdate:
+      type: object
+      properties:
+        firstName:
+          type: string
+          example: John
+        lastName:
+          type: string
+          example: Doe
+        emergencyContactName:
+          type: string
+          example: "Jane Doe"
+        emergencyContactPhone:
+          type: string
+          example: "2348000000000"
+        emergencyContactEmail:
+          type: string
+          format: email
+          example: jane@example.com
+
+    LinkPractitioner:
+      type: object
+      required: [practitionerId]
+      properties:
+        practitionerId:
+          type: string
+          format: uuid
+          example: "9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d"
+
+    ConditionInput:
+      type: object
+      required: [conditionName, severity, diagnosedAt]
+      properties:
+        conditionName:
+          type: string
+          example: Asthma
+        severity:
+          type: string
+          enum: [mild, moderate, severe]
+          example: mild
+        diagnosedAt:
+          type: string
+          format: date
+          example: "2015-06-01"
+        status:
+          type: string
+          enum: [active, inactive, remission]
+          default: active
+          example: active
+
+    Condition:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          example: "9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d"
+        profileId:
+          type: string
+          format: uuid
+          example: "7c1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d"
+        conditionName:
+          type: string
+          example: Asthma
+        severity:
+          type: string
+          enum: [mild, moderate, severe]
+          example: mild
+        diagnosedAt:
+          type: string
+          format: date
+          example: "2015-06-01"
+        status:
+          type: string
+          enum: [active, inactive, remission]
+          example: active
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    MedicationInput:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+          example: Albuterol
+        dosage:
+          type: string
+          example: 90mcg
+        frequency:
+          type: string
+          example: As needed
+        startDate:
+          type: string
+          format: date
+          example: "2015-06-01"
+        endDate:
+          type: string
+          format: date
+          nullable: true
+          example: "2026-06-01"
+
+    Medication:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          example: "9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d"
+        profileId:
+          type: string
+          format: uuid
+          example: "7c1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d"
+        name:
+          type: string
+          example: Albuterol
+        dosage:
+          type: string
+          example: 90mcg
+        frequency:
+          type: string
+          example: As needed
+        startDate:
+          type: string
+          format: date
+          example: "2015-06-01"
+        endDate:
+          type: string
+          format: date
+          nullable: true
+          example: "2026-06-01"
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    VitalLogInput:
+      type: object
+      properties:
+        bmi:
+          type: number
+          example: 22.5
+        bloodPressureSystolic:
+          type: integer
+          example: 120
+        bloodPressureDiastolic:
+          type: integer
+          example: 80
+        bloodSugar:
+          type: number
+          example: 95.0
+        temperature:
+          type: number
+          example: 36.8
+        pulseRate:
+          type: integer
+          example: 72
+
+    VitalLog:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          example: "9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d"
+        profileId:
+          type: string
+          format: uuid
+          example: "7c1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d"
+        bmi:
+          type: number
+          example: 22.5
+        bloodPressureSystolic:
+          type: integer
+          example: 120
+        bloodPressureDiastolic:
+          type: integer
+          example: 80
+        bloodSugar:
+          type: number
+          example: 95.0
+        temperature:
+          type: number
+          example: 36.8
+        pulseRate:
+          type: integer
+          example: 72
+        loggedAt:
+          type: string
+          format: date-time
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    MedicationLogInput:
+      type: object
+      required: [medicationId]
+      properties:
+        medicationId:
+          type: string
+          format: uuid
+          example: "9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d"
+        status:
+          type: string
+          enum: [taken, missed, skipped]
+          default: taken
+          example: taken
+        notes:
+          type: string
+          example: Taken after breakfast
+
+    MedicationLog:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          example: "9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d"
+        medicationId:
+          type: string
+          format: uuid
+          example: "7c1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d"
+        status:
+          type: string
+          enum: [taken, missed, skipped]
+          example: taken
+        notes:
+          type: string
+          example: Taken after breakfast
+        takenAt:
+          type: string
+          format: date-time
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    Observation:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          example: "9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d"
+        profileId:
+          type: string
+          format: uuid
+          example: "7c1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d"
+        symptom:
+          type: string
+          example: Chest tightness
+        severity:
+          type: string
+          enum: [mild, moderate, severe]
+          example: moderate
+        notes:
+          type: string
+          example: Patient reported slight breathing issues after running.
+        observedAt:
+          type: string
+          format: date-time
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    Reminder:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          example: "9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d"
+        profileId:
+          type: string
+          format: uuid
+          example: "7c1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d"
+        phoneNumber:
+          type: string
+          example: "2348067651234"
+        type:
+          type: string
+          enum: [medication, exercise, diet, appointment, other]
+          example: medication
+        title:
+          type: string
+          example: Albuterol Intake
+        description:
+          type: string
+          example: Take 1 puff of Albuterol
+        scheduledAt:
+          type: string
+          format: date-time
+        recurrence:
+          type: string
+          enum: [none, daily, weekly, monthly]
+          example: daily
+        status:
+          type: string
+          enum: [pending, sent, cancelled]
+          example: pending
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    UserProfile:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        userId:
+          type: string
+          format: uuid
+        firstName:
+          type: string
+        lastName:
+          type: string
+        gender:
+          type: string
+          enum: [male, female, other]
+        dateOfBirth:
+          type: string
+          format: date
+        phoneNumber:
+          type: string
+        bloodGroup:
+          type: string
+          enum: [A+, A-, B+, B-, AB+, AB-, O+, O-]
+        genotype:
+          type: string
+          enum: [AA, AS, SS, AC, SC]
+        emergencyContactName:
+          type: string
+        emergencyContactPhone:
+          type: string
+        emergencyContactEmail:
+          type: string
+        linkedPractitioners:
+          type: array
+          items:
+            type: string
+            format: uuid
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    UserProfileResponse:
+      allOf:
+        - $ref: '#/components/schemas/UserProfile'
+        - type: object
+          properties:
+            Conditions:
+              type: array
+              items:
+                $ref: '#/components/schemas/Condition'
+            Medications:
+              type: array
+              items:
+                $ref: '#/components/schemas/Medication'
+            VitalLogs:
+              type: array
+              items:
+                $ref: '#/components/schemas/VitalLog'
+            Observations:
+              type: array
+              items:
+                $ref: '#/components/schemas/Observation'
+            Reminders:
+              type: array
+              items:
+                $ref: '#/components/schemas/Reminder'
+
+    OrganizationRegister:
+      type: object
+      required:
+        - name
+        - type
+        - ownership
+        - email
+        - description
+        - phone
+        - address
+        - state
+        - lga
+        - registrationNumber
+      properties:
+        name:
+          type: string
+          example: City Hospital
+        type:
+          type: string
+          enum: [general_hospital, specialist_hospital, clinic, health_centre, maternity_home, diagnostic_centre]
+          example: general_hospital
+        ownership:
+          type: string
+          enum: [federal, state, private, ngo, faith_based]
+          example: private
+        email:
+          type: string
+          format: email
+          example: info@cityhospital.com
+        phone:
+          type: string
+          example: "2348000000000"
+        description:
+          type: string
+          example: Full-service private healthcare facility.
+        address:
+          type: string
+          example: "12 Hospital Rd, Ikeja"
+        state:
+          type: string
+          example: Lagos
+        lga:
+          type: string
+          example: Ikeja
+        registrationNumber:
+          type: string
+          example: CAC-123456
+
+    OrganizationLogin:
+      type: object
+      required: [username, password]
+      properties:
+        username:
+          type: string
+          example: city_hospital_admin
+        password:
+          type: string
+          example: initialSecurePass
+
+    Organization:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        type:
+          type: string
+          enum: [general_hospital, specialist_hospital, clinic, health_centre, maternity_home, diagnostic_centre]
+        ownership:
+          type: string
+          enum: [federal, state, private, ngo, faith_based]
+        email:
+          type: string
+          format: email
+        phone:
+          type: string
+        description:
+          type: string
+        address:
+          type: string
+        state:
+          type: string
+        lga:
+          type: string
+        registrationNumber:
+          type: string
+        status:
+          type: string
+          enum: [pending, active, suspended]
+        verifiedBy:
+          type: string
+          format: uuid
+          nullable: true
+        verifiedAt:
+          type: string
+          format: date-time
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    OrganizationUpdateStatus:
+      type: object
+      required: [organization_id, status]
+      properties:
+        organization_id:
+          type: string
+          format: uuid
+          example: "9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d"
+        status:
+          type: string
+          enum: [active, pending, suspended]
+          example: active
+
+    OrganizationApprove:
+      type: object
+      required: [organization_id, username]
+      properties:
+        organization_id:
+          type: string
+          format: uuid
+          example: "9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d"
+        username:
+          type: string
+          example: city_hospital_admin
+
+    OrganizationSummary:
+      type: object
+      properties:
+        departments:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+                format: uuid
+              departmentName:
+                type: string
+              description:
+                type: string
+              phone:
+                type: string
+              email:
+                type: string
+                format: email
+              status:
+                type: string
+                enum: [pending, approved]
+        totalPractitioners:
+          type: integer
+          example: 12
+
+    DepartmentRegister:
+      type: object
+      required: [departmentName, username, password, phone, description, email, organization_id]
+      properties:
+        departmentName:
+          type: string
+          example: Pediatrics
+        username:
+          type: string
+          example: peds_dept
+        password:
+          type: string
+          example: peds_pass_123
+        phone:
+          type: string
+          example: "2348011111111"
+        description:
+          type: string
+          example: Department specializing in pediatric care.
+        email:
+          type: string
+          format: email
+          example: peds@cityhospital.com
+        organization_id:
+          type: string
+          format: uuid
+          example: "9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d"
+
+    DepartmentApprove:
+      type: object
+      required: [department_id]
+      properties:
+        department_id:
+          type: string
+          format: uuid
+          example: "9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d"
+
+    Department:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        organization_id:
+          type: string
+          format: uuid
+        departmentName:
+          type: string
+        username:
+          type: string
+        description:
+          type: string
+        phone:
+          type: string
+        email:
+          type: string
+          format: email
+        headOfDepartmentId:
+          type: string
+          format: uuid
+          nullable: true
+        status:
+          type: string
+          enum: [pending, approved]
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    PractitionerRegister:
+      type: object
+      required:
+        - organization_id
+        - job
+        - staffId
+        - email
+        - phone
+        - username
+        - firstName
+        - lastName
+        - password
+      properties:
+        organization_id:
+          type: string
+          format: uuid
+          example: "9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d"
+        department_id:
+          type: string
+          format: uuid
+          example: "8b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d"
+        job:
+          type: string
+          enum: [doctor, nurse, lab_technician, pharmacist, hod]
+          example: doctor
+        staffId:
+          type: string
+          example: "ST-098"
+        mdcnNumber:
+          type: string
+          example: "MDCN-44321"
+        firstName:
+          type: string
+          example: Adewale
+        lastName:
+          type: string
+          example: Alabi
+        password:
+          type: string
+          minLength: 6
+          example: securepass123
+        email:
+          type: string
+          format: email
+          example: adewale.alabi@example.com
+        phone:
+          type: string
+          example: "2348033333333"
+        username:
+          type: string
+          example: dr_adewale
+        specialization:
+          type: string
+          example: Pediatric Surgery
+        qualification:
+          type: string
+          example: "MBBS, FWACS"
+        employmentStatus:
+          type: string
+          enum: [full_time, part_time, locum, intern, volunteer]
+          example: full_time
+        joinedAt:
+          type: string
+          format: date
+          example: "2023-01-15"
+
+    PractitionerLogin:
+      type: object
+      required: [username, password]
+      properties:
+        username:
+          type: string
+          example: dr_adewale
+        password:
+          type: string
+          example: securepass123
+
+    Practitioner:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        organization_id:
+          type: string
+          format: uuid
+        department_id:
+          type: string
+          format: uuid
+          nullable: true
+        job:
+          type: string
+          enum: [doctor, nurse, lab_technician, pharmacist, hod]
+        staffId:
+          type: string
+        mdcnNumber:
+          type: string
+        firstName:
+          type: string
+        lastName:
+          type: string
+        email:
+          type: string
+          format: email
+        phone:
+          type: string
+        username:
+          type: string
+        specialization:
+          type: string
+        qualification:
+          type: string
+        employmentStatus:
+          type: string
+          enum: [full_time, part_time, locum, intern, volunteer]
+        joinedAt:
+          type: string
+          format: date
+        leftAt:
+          type: string
+          format: date
+          nullable: true
+        status:
+          type: string
+          enum: [approved, pending, rejected]
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+          example: Detailed explanation of the validation or system error.
+
+    SuccessResponse:
+      type: object
+      properties:
+        message:
+          type: string
+          example: Request processed successfully.
