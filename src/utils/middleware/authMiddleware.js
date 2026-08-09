@@ -168,3 +168,41 @@ export async function authenticateHOD(req, res, next) {
         return res.status(500).json({ error: 'Internal server error during authentication.' });
     }
 }
+
+/**
+ * Middleware to verify the request comes from either an approved Department or an approved HOD Practitioner.
+ */
+export async function authenticateDepartmentOrHOD(req, res, next) {
+    const token = req.cookies.access_token;
+
+    if (!token) {
+        return res.status(401).json({ error: 'Access token is missing.' });
+    }
+
+    const decoded = verifyAccessToken(token);
+    if (!decoded) {
+        return res.status(401).json({ error: 'Invalid or expired access token.' });
+    }
+
+    try {
+        if (decoded.role === 'department') {
+            const dept = await Department.findByPk(decoded.id);
+            if (!dept || dept.status !== 'approved') {
+                return res.status(403).json({ error: 'Department is not approved or is inactive.' });
+            }
+            req.user = decoded;
+            return next();
+        } else if (decoded.role === 'practitioner') {
+            const prac = await Practitioner.findByPk(decoded.id);
+            if (!prac || prac.job !== 'hod' || prac.status !== 'approved') {
+                return res.status(403).json({ error: 'Access denied. Only approved Heads of Department (HOD) are authorized.' });
+            }
+            req.user = decoded;
+            return next();
+        } else {
+            return res.status(403).json({ error: 'Access denied. Department or HOD credentials required.' });
+        }
+    } catch (err) {
+        return res.status(500).json({ error: 'Internal server error during authentication.' });
+    }
+}

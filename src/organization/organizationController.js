@@ -153,6 +153,19 @@ class OrganizationController {
             return res.status(error.statusCode || 500).json({ error: error.message });
         }
     }
+
+    async generateReferral(req, res) {
+        try {
+            // Organization manager only (org ID from req.user.id)
+            const orgId = req.user.id;
+            const { name, email } = req.body;
+            const result = await organizationServices.generateReferralCode(orgId, { name, email });
+            return res.status(201).json(result);
+        } catch (error) {
+            console.error('Organization generateReferral controller error:', error);
+            return res.status(error.statusCode || 500).json({ error: error.message });
+        }
+    }
 }
 
 export default new OrganizationController();

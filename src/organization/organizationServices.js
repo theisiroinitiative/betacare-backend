@@ -6,6 +6,8 @@ import Department from '../department/departmentModel.js';
 import Practitioner from '../practitioner/practitionerModel.js';
 import emailService from '../services/emailServices/emailService.js';
 import redisClient from '../config/redisConfig.js';
+import Referral from '../schedule/referrals/referralModel.js';
+import { generateReferralCode } from '../utils/referralUtils.js';
 
 const JWT_ACCESS_SECRET = process.env.JWT_ACCESS_SECRET || 'your_jwt_access_secret';
 const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || 'your_jwt_refresh_secret';
@@ -235,6 +237,42 @@ class OrganizationServices {
         // Delete from database. Associations with CASCADE will delete departments & practitioners.
         await Organization.destroy({ where: { id: orgId } });
         return 'success';
+    }
+
+    async generateReferralCode(orgId, { name, email }) {
+        const org = await Organization.findByPk(orgId);
+        if (!org) {
+            const err = new Error('Organization not found.');
+            err.statusCode = 404;
+            throw err;
+        }
+
+        const referralCode = generateReferralCode('REF-ORG');
+        const deleteAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days from now
+
+        await Referral.create({
+            referrerid: orgId,
+            referrerType: 'organisation',
+            target: email,
+            deleteAt,
+            referralCode,
+            status: 'fresh'
+        });
+
+        await emailService.sendEmail({
+            to: email,
+            subject: 'Department Invitation Referral Code',
+            html: `<p>Hello ${name},</p>
+                   <p>Your organization, <strong>${org.name}</strong>, has invited your department to register on BetaCare.</p>
+                   <p>Your referral code is: <strong>${referralCode}</strong></p>
+                   <p>This referral code will expire in 7 days (on ${deleteAt.toUTCString()}).</p>`
+        });
+
+        return {
+            message: 'Referral code generated and sent successfully',
+            referralCode,
+            deleteAt
+        };
     }
 }
 

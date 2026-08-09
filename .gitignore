@@ -39,3 +39,5 @@ temp/
 
 # Antigravity artifacts/cache
 .gemini/
+
+.npmrc

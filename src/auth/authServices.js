@@ -176,11 +176,16 @@ class AuthServices {
             role: user.role
         };
 
+        const accountSetupStage = {
+            emailVerified: user.isEmailVerified,
+            onboardingComplete: user.isWhatsappVerified
+        }
+
         // Generate tokens
         const accessToken = signAccessToken(userData);
         const refreshToken = await signRefreshToken(userData); // storing in db inside signRefreshToken
 
-        return { accessToken, refreshToken };
+        return { accessToken, refreshToken, accountSetupStage  };
     }
 
     async renewAccessToken(refreshTokenString) {

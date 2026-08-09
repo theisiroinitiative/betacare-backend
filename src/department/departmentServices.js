@@ -6,23 +6,33 @@ import Organization from '../organization/organizationModel.js';
 import Practitioner from '../practitioner/practitionerModel.js';
 import emailService from '../services/emailServices/emailService.js';
 import redisClient from '../config/redisConfig.js';
+import Referral from '../schedule/referrals/referralModel.js';
+import { generateReferralCode } from '../utils/referralUtils.js';
 
 const JWT_ACCESS_SECRET = process.env.JWT_ACCESS_SECRET || 'your_jwt_access_secret';
 const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || 'your_jwt_refresh_secret';
 
 class DepartmentServices {
-    async createDepartment(hodId, data) {
-        // Verify HOD is approved as a practitioner
-        const hod = await Practitioner.findByPk(hodId);
-        if (!hod) {
-            const err = new Error('HOD practitioner not found.');
-            err.statusCode = 404;
+    async createDepartment(data, hodId = null) {
+        // Validate referral code
+        const referral = await Referral.findOne({
+            where: {
+                referralCode: data.referralCode,
+                referrerType: 'organisation',
+                status: 'fresh',
+                deleteAt: { [Op.gt]: new Date() }
+            }
+        });
+
+        if (!referral) {
+            const err = new Error('Invalid or expired referral code.');
+            err.statusCode = 400;
             throw err;
         }
 
-        if (hod.job !== 'hod' || hod.status !== 'approved') {
-            const err = new Error('Only approved Head of Department (HOD) practitioners can register a department.');
-            err.statusCode = 403;
+        if (referral.referrerid !== data.organization_id) {
+            const err = new Error('Referral code does not match the specified organization.');
+            err.statusCode = 400;
             throw err;
         }
 
@@ -38,7 +48,7 @@ class DepartmentServices {
         const salt = await bcrypt.genSalt(10);
         const hashedPassword = await bcrypt.hash(data.password, salt);
 
-        // Fetch organization to get email and ensure it exists
+        // Fetch organization to ensure it exists
         const org = await Organization.findByPk(data.organization_id);
         if (!org) {
             const err = new Error('Organization not found.');
@@ -46,30 +56,76 @@ class DepartmentServices {
             throw err;
         }
 
-        // Create department in pending status
+        const effectiveHodId = hodId || data.headOfDepartmentId || null;
+
+        // Create department directly in approved status (pre-authorized via referral code)
         const department = await Department.create({
             ...data,
             password: hashedPassword,
-            headOfDepartmentId: hodId,
-            status: 'pending'
+            headOfDepartmentId: effectiveHodId,
+            status: 'approved'
         });
 
-        // Set HOD practitioner's department_id
-        hod.department_id = department.id;
-        await hod.save();
+        if (effectiveHodId) {
+            const hod = await Practitioner.findByPk(effectiveHodId);
+            if (hod) {
+                hod.department_id = department.id;
+                await hod.save();
+            }
+        }
 
-        // Send email to Organization
-        await emailService.sendEmail({
-            to: org.email,
-            subject: 'New Department Registered Under Your Organization',
-            html: `<p>Hello ${org.name},</p>
-                   <p>A new department has been registered under your organization:</p>
-                   <p><strong>Department Name:</strong> ${data.departmentName}</p>
-                   <p><strong>HOD Name:</strong> ${hod.firstName} ${hod.lastName}</p>
-                   <p>Please log in to your dashboard to review and approve this department.</p>`
-        });
+        // Mark referral code as used
+        referral.status = 'used';
+        await referral.save();
 
         return department;
+    }
+
+    async generateReferralCode(requesterId, requesterRole, { name, email }) {
+        let deptId = requesterId;
+        if (requesterRole === 'practitioner') {
+            const dept = await Department.findOne({ where: { headOfDepartmentId: requesterId } });
+            if (!dept) {
+                const err = new Error('HOD department not found.');
+                err.statusCode = 404;
+                throw err;
+            }
+            deptId = dept.id;
+        }
+
+        const dept = await Department.findByPk(deptId);
+        if (!dept) {
+            const err = new Error('Department not found.');
+            err.statusCode = 404;
+            throw err;
+        }
+
+        const referralCode = generateReferralCode('REF-DEPT');
+        const deleteAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days from now
+
+        await Referral.create({
+            referrerid: deptId,
+            referrerType: 'department',
+            target: email,
+            deleteAt,
+            referralCode,
+            status: 'fresh'
+        });
+
+        await emailService.sendEmail({
+            to: email,
+            subject: 'Practitioner Invitation Referral Code',
+            html: `<p>Hello ${name},</p>
+                   <p>The department <strong>${dept.departmentName}</strong> has invited you to register as a practitioner on BetaCare.</p>
+                   <p>Your referral code is: <strong>${referralCode}</strong></p>
+                   <p>This referral code will expire in 7 days (on ${deleteAt.toUTCString()}).</p>`
+        });
+
+        return {
+            message: 'Referral code generated and sent successfully',
+            referralCode,
+            deleteAt
+        };
     }
 
     async approveDepartment(orgId, deptId) {

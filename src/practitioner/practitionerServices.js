@@ -1,18 +1,46 @@
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
+import { Op } from 'sequelize';
 import Practitioner from './practitionerModel.js';
 import Department from '../department/departmentModel.js';
 import emailService from '../services/emailServices/emailService.js';
 import redisClient from '../config/redisConfig.js';
+import Referral from '../schedule/referrals/referralModel.js';
 
 const JWT_ACCESS_SECRET = process.env.JWT_ACCESS_SECRET || 'your_jwt_access_secret';
 const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || 'your_jwt_refresh_secret';
 
 class PractitionerServices {
     async registerPractitioner(data) {
-        // Hash password
-        const salt = await bcrypt.genSalt(10);
-        const hashedPassword = await bcrypt.hash(data.password, salt);
+        // Validate referral code
+        const referral = await Referral.findOne({
+            where: {
+                referralCode: data.referralCode,
+                referrerType: 'department',
+                status: 'fresh',
+                deleteAt: { [Op.gt]: new Date() }
+            }
+        });
+
+        if (!referral) {
+            const err = new Error('Invalid or expired referral code.');
+            err.statusCode = 400;
+            throw err;
+        }
+
+        // Validate department associated with referral code
+        const department = await Department.findByPk(referral.referrerid);
+        if (!department) {
+            const err = new Error('Department associated with this referral code was not found.');
+            err.statusCode = 404;
+            throw err;
+        }
+
+        if (data.department_id && data.department_id !== department.id) {
+            const err = new Error('Referral code does not match the specified department.');
+            err.statusCode = 400;
+            throw err;
+        }
 
         // Check unique username
         const existingUsername = await Practitioner.findOne({ where: { username: data.username } });
@@ -22,29 +50,27 @@ class PractitionerServices {
             throw err;
         }
 
-        // Create practitioner as pending
+        // Hash password
+        const salt = await bcrypt.genSalt(10);
+        const hashedPassword = await bcrypt.hash(data.password, salt);
+
+        // Create practitioner in approved status (pre-authorized via referral code)
         const practitioner = await Practitioner.create({
             ...data,
+            department_id: department.id,
+            organization_id: department.organization_id,
             password: hashedPassword,
-            status: 'pending'
+            status: 'approved'
         });
 
-        // Email notification to the HOD of the department
-        if (data.department_id) {
-            const department = await Department.findByPk(data.department_id);
-            if (department && department.headOfDepartmentId) {
-                const hod = await Practitioner.findByPk(department.headOfDepartmentId);
-                if (hod) {
-                    await emailService.sendEmail({
-                        to: hod.email,
-                        subject: 'New Practitioner Registration Notification',
-                        html: `<p>Hello Dr. ${hod.lastName},</p>
-                               <p>A new practitioner, ${data.firstName} ${data.lastName}, has registered under your department (${department.departmentName}).</p>
-                               <p>Please log in and review their request to approve or reject them.</p>`
-                    });
-                }
-            }
+        if (data.job === 'hod' && !department.headOfDepartmentId) {
+            department.headOfDepartmentId = practitioner.id;
+            await department.save();
         }
+
+        // Mark referral code as used
+        referral.status = 'used';
+        await referral.save();
 
         return 'practitioner registered successfully';
     }

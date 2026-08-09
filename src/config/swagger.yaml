@@ -335,14 +335,7 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  code:
-                    type: string
-                    example: "XXXXXX-2348067651234"
-                  message:
-                    type: string
-                    example: "send the code to our whatsapp agent @ 2348000000000"
+                $ref: '#/components/schemas/OnboardResponse'
         '400':
           description: Validation error or profile already onboarded.
           content:
@@ -414,13 +407,7 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  message:
-                    type: string
-                    example: Profile updated successfully.
-                  profile:
-                    $ref: '#/components/schemas/UserProfile'
+                $ref: '#/components/schemas/DemographicsUpdateResponse'
         '401':
           description: Unauthorized.
           content:
@@ -454,13 +441,7 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  message:
-                    type: string
-                    example: Practitioner linked successfully.
-                  profile:
-                    $ref: '#/components/schemas/UserProfile'
+                $ref: '#/components/schemas/LinkPractitionerResponse'
         '400':
           description: Validation or entity error.
           content:
@@ -500,13 +481,7 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  message:
-                    type: string
-                    example: Practitioner unlinked successfully.
-                  profile:
-                    $ref: '#/components/schemas/UserProfile'
+                $ref: '#/components/schemas/UnlinkPractitionerResponse'
         '400':
           description: Validation error.
           content:
@@ -574,13 +549,7 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  message:
-                    type: string
-                    example: Condition added successfully.
-                  condition:
-                    $ref: '#/components/schemas/Condition'
+                $ref: '#/components/schemas/ConditionCreateResponse'
         '400':
           description: Validation error.
           content:
@@ -622,29 +591,14 @@ paths:
         content:
           application/json:
             schema:
-              type: object
-              properties:
-                severity:
-                  type: string
-                  enum: [mild, moderate, severe]
-                  example: moderate
-                status:
-                  type: string
-                  enum: [active, inactive, remission]
-                  example: remission
+              $ref: '#/components/schemas/ConditionUpdateInput'
       responses:
         '200':
           description: Condition updated successfully.
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  message:
-                    type: string
-                    example: Condition updated successfully.
-                  condition:
-                    $ref: '#/components/schemas/Condition'
+                $ref: '#/components/schemas/ConditionCreateResponse'
         '400':
           description: Validation error.
           content:
@@ -759,13 +713,7 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  message:
-                    type: string
-                    example: Medication added successfully.
-                  medication:
-                    $ref: '#/components/schemas/Medication'
+                $ref: '#/components/schemas/MedicationCreateResponse'
         '400':
           description: Validation error.
           content:
@@ -807,31 +755,14 @@ paths:
         content:
           application/json:
             schema:
-              type: object
-              properties:
-                dosage:
-                  type: string
-                  example: 100mg
-                frequency:
-                  type: string
-                  example: Twice daily
-                endDate:
-                  type: string
-                  format: date
-                  example: "2026-08-30"
+              $ref: '#/components/schemas/MedicationUpdateInput'
       responses:
         '200':
           description: Medication updated successfully.
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  message:
-                    type: string
-                    example: Medication updated successfully.
-                  medication:
-                    $ref: '#/components/schemas/Medication'
+                $ref: '#/components/schemas/MedicationUpdateResponse'
         '400':
           description: Validation error.
           content:
@@ -946,13 +877,7 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  message:
-                    type: string
-                    example: Vitals logged successfully.
-                  vital:
-                    $ref: '#/components/schemas/VitalLog'
+                $ref: '#/components/schemas/VitalLogCreateResponse'
         '400':
           description: Validation error.
           content:
@@ -1020,13 +945,7 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  message:
-                    type: string
-                    example: Medication intake logged successfully.
-                  log:
-                    $ref: '#/components/schemas/MedicationLog'
+                $ref: '#/components/schemas/MedicationLogCreateResponse'
         '400':
           description: Validation error.
           content:
@@ -1534,14 +1453,58 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
 
+  /organization/generate-referral:
+    post:
+      tags:
+        - Organization Management
+      summary: Generate referral code for department signup (Org only)
+      description: Generate a 7-day expiring referral code for a target department and email it.
+      security:
+        - AccessTokenAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GenerateReferralInput'
+      responses:
+        '201':
+          description: Referral code generated and emailed successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReferralCodeResponse'
+        '400':
+          description: Validation error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized. Access token missing or invalid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden. Active organization credentials required.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
   /department/new:
     post:
       tags:
         - Department Onboarding
-      summary: Register a new department under an organization (HOD only)
-      description: Register a new department. HOD credentials are required.
-      security:
-        - AccessTokenAuth: []
+      summary: Register a new department under an organization
+      description: Register a new department using a pre-authorized 7-day expiring referral code generated by an organization.
       requestBody:
         required: true
         content:
@@ -1550,25 +1513,65 @@ paths:
               $ref: '#/components/schemas/DepartmentRegister'
       responses:
         '201':
-          description: Department registered successfully.
+          description: Department registered successfully in approved status.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/SuccessResponse'
+                $ref: '#/components/schemas/DepartmentRegisterResponse'
         '400':
-          description: Validation error or department username already taken.
+          description: Validation error, invalid/expired referral code, or username already taken.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Organization not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /department/generate-referral:
+    post:
+      tags:
+        - Department Onboarding
+      summary: Generate referral code for practitioner signup (Department or HOD only)
+      description: Generate a 7-day expiring referral code for a target practitioner and email it.
+      security:
+        - AccessTokenAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GenerateReferralInput'
+      responses:
+        '201':
+          description: Referral code generated and emailed successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReferralCodeResponse'
+        '400':
+          description: Validation error.
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
         '401':
-          description: Unauthorized.
+          description: Unauthorized. Access token missing or invalid.
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
         '403':
-          description: Forbidden. Approved Head of Department (HOD) credentials required.
+          description: Forbidden. Approved Department or HOD credentials required.
           content:
             application/json:
               schema:
@@ -1727,15 +1730,7 @@ paths:
         content:
           application/json:
             schema:
-              type: object
-              required: [username, password]
-              properties:
-                username:
-                  type: string
-                  example: peds_dept
-                password:
-                  type: string
-                  example: peds_pass_123
+              $ref: '#/components/schemas/DepartmentLogin'
       responses:
         '200':
           description: Login successful.
@@ -1813,7 +1808,7 @@ paths:
       tags:
         - Practitioner Management
       summary: Register a practitioner
-      description: Register a new medical practitioner. Pends HOD review.
+      description: Register a new practitioner using a pre-authorized 7-day expiring referral code generated by a department.
       requestBody:
         required: true
         content:
@@ -1822,13 +1817,19 @@ paths:
               $ref: '#/components/schemas/PractitionerRegister'
       responses:
         '201':
-          description: Practitioner registered successfully, HOD notified.
+          description: Practitioner registered successfully in approved status.
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/SuccessResponse'
         '400':
-          description: Validation error or username already taken.
+          description: Validation error, invalid/expired referral code, or username already taken.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Department associated with referral code not found.
           content:
             application/json:
               schema:
@@ -1937,13 +1938,7 @@ paths:
         content:
           application/json:
             schema:
-              type: object
-              required: [practitioner_id]
-              properties:
-                practitioner_id:
-                  type: string
-                  format: uuid
-                  example: "9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d"
+              $ref: '#/components/schemas/PractitionerApproveRejectInput'
       responses:
         '200':
           description: Practitioner approved successfully.
@@ -1989,13 +1984,7 @@ paths:
         content:
           application/json:
             schema:
-              type: object
-              required: [practitioner_id]
-              properties:
-                practitioner_id:
-                  type: string
-                  format: uuid
-                  example: "9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d"
+              $ref: '#/components/schemas/PractitionerApproveRejectInput'
       responses:
         '200':
           description: Practitioner rejected successfully.
@@ -2204,13 +2193,7 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  message:
-                    type: string
-                    example: Condition added successfully.
-                  condition:
-                    $ref: '#/components/schemas/Condition'
+                $ref: '#/components/schemas/ConditionCreateResponse'
         '400':
           description: Validation error.
           content:
@@ -2270,13 +2253,7 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  message:
-                    type: string
-                    example: Medication added successfully.
-                  medication:
-                    $ref: '#/components/schemas/Medication'
+                $ref: '#/components/schemas/MedicationCreateResponse'
         '400':
           description: Validation error.
           content:
@@ -2387,31 +2364,14 @@ paths:
         content:
           application/json:
             schema:
-              type: object
-              properties:
-                dosage:
-                  type: string
-                  example: 100mg
-                frequency:
-                  type: string
-                  example: Twice daily
-                endDate:
-                  type: string
-                  format: date
-                  example: "2026-08-30"
+              $ref: '#/components/schemas/MedicationUpdateInput'
       responses:
         '200':
           description: Medication updated successfully.
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  message:
-                    type: string
-                    example: Medication updated successfully.
-                  medication:
-                    $ref: '#/components/schemas/Medication'
+                $ref: '#/components/schemas/MedicationUpdateResponse'
         '400':
           description: Validation error.
           content:
@@ -3336,9 +3296,39 @@ components:
           type: integer
           example: 12
 
+    GenerateReferralInput:
+      type: object
+      required:
+        - name
+        - email
+      properties:
+        name:
+          type: string
+          description: Target Department or Practitioner name.
+          example: Pediatrics Department
+        email:
+          type: string
+          format: email
+          description: Target Department or Practitioner email address.
+          example: pediatrics@cityhospital.com
+
+    ReferralCodeResponse:
+      type: object
+      properties:
+        message:
+          type: string
+          example: Referral code generated and sent successfully
+        referralCode:
+          type: string
+          example: REF-ORG-A1B2C3D4
+        deleteAt:
+          type: string
+          format: date-time
+          example: "2026-08-16T03:00:00.000Z"
+
     DepartmentRegister:
       type: object
-      required: [departmentName, username, password, phone, description, email, organization_id]
+      required: [departmentName, username, password, phone, description, email, organization_id, referralCode]
       properties:
         departmentName:
           type: string
@@ -3363,6 +3353,18 @@ components:
           type: string
           format: uuid
           example: "9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d"
+        referralCode:
+          type: string
+          example: "REF-ORG-A1B2C3D4"
+
+    DepartmentRegisterResponse:
+      type: object
+      properties:
+        message:
+          type: string
+          example: Department registered successfully
+        department:
+          $ref: '#/components/schemas/Department'
 
     DepartmentApprove:
       type: object
@@ -3419,6 +3421,7 @@ components:
         - firstName
         - lastName
         - password
+        - referralCode
       properties:
         organization_id:
           type: string
@@ -3458,6 +3461,9 @@ components:
         username:
           type: string
           example: dr_adewale
+        referralCode:
+          type: string
+          example: "REF-DEPT-B2C3D4E5"
         specialization:
           type: string
           example: Pediatric Surgery
@@ -3538,6 +3544,134 @@ components:
         updatedAt:
           type: string
           format: date-time
+
+    DepartmentLogin:
+      type: object
+      required: [username, password]
+      properties:
+        username:
+          type: string
+          example: peds_dept
+        password:
+          type: string
+          example: peds_pass_123
+
+    PractitionerApproveRejectInput:
+      type: object
+      required: [practitioner_id]
+      properties:
+        practitioner_id:
+          type: string
+          format: uuid
+          example: "9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d"
+
+    ConditionUpdateInput:
+      type: object
+      properties:
+        severity:
+          type: string
+          enum: [mild, moderate, severe]
+          example: moderate
+        status:
+          type: string
+          enum: [active, inactive, remission]
+          example: remission
+
+    MedicationUpdateInput:
+      type: object
+      properties:
+        dosage:
+          type: string
+          example: 100mg
+        frequency:
+          type: string
+          example: Twice daily
+        endDate:
+          type: string
+          format: date
+          example: "2026-08-30"
+
+    OnboardResponse:
+      type: object
+      properties:
+        code:
+          type: string
+          example: "XXXXXX-2348067651234"
+        message:
+          type: string
+          example: "send the code to our whatsapp agent @ 2348000000000"
+
+    ConditionCreateResponse:
+      type: object
+      properties:
+        message:
+          type: string
+          example: Condition added successfully.
+        condition:
+          $ref: '#/components/schemas/Condition'
+
+    MedicationCreateResponse:
+      type: object
+      properties:
+        message:
+          type: string
+          example: Medication prescribed successfully.
+        medication:
+          $ref: '#/components/schemas/Medication'
+
+    MedicationUpdateResponse:
+      type: object
+      properties:
+        message:
+          type: string
+          example: Medication updated successfully.
+        medication:
+          $ref: '#/components/schemas/Medication'
+
+    VitalLogCreateResponse:
+      type: object
+      properties:
+        message:
+          type: string
+          example: Vitals logged successfully.
+        vital:
+          $ref: '#/components/schemas/VitalLog'
+
+    MedicationLogCreateResponse:
+      type: object
+      properties:
+        message:
+          type: string
+          example: Medication intake logged successfully.
+        log:
+          $ref: '#/components/schemas/MedicationLog'
+
+    DemographicsUpdateResponse:
+      type: object
+      properties:
+        message:
+          type: string
+          example: Profile updated successfully.
+        profile:
+          $ref: '#/components/schemas/UserProfile'
+
+    LinkPractitionerResponse:
+      type: object
+      properties:
+        message:
+          type: string
+          example: Practitioner linked successfully.
+        profile:
+          $ref: '#/components/schemas/UserProfile'
+
+    UnlinkPractitionerResponse:
+      type: object
+      properties:
+        message:
+          type: string
+          example: Practitioner unlinked successfully.
+        profile:
+          $ref: '#/components/schemas/UserProfile'
 
     ErrorResponse:
       type: object

@@ -25,6 +25,8 @@ import WhatsAppJidMapping from './auth/whatsapp-auth/whatsappMappingModel.js';
 import Observation from './profiles/observation/observationModel.js';
 import Reminder from './schedule/reminderModel.js';
 import { startReminderScheduler } from './schedule/reminderScheduler.js';
+import Referral from './schedule/referrals/referralModel.js';
+import { startReferralScheduler } from './schedule/referrals/referralScheduler.js';
 import whatsappBotService from './agent/agentServices.js';
 
 // Import routers
@@ -126,8 +128,9 @@ async function initializeDatabase() {
         await sequelize.sync({ force: false });
         console.log('Database models synchronized successfully.');
 
-        // Start the reminder scheduler after DB is ready
+        // Start the reminder & referral schedulers after DB is ready
         startReminderScheduler();
+        startReferralScheduler();
 
         // Initialize WhatsApp bot service
         await whatsappBotService.init();

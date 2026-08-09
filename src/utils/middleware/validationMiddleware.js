@@ -82,8 +82,19 @@ export function validateOrgLogin(req, res, next) {
     next();
 }
 
+export function validateGenerateReferral(req, res, next) {
+    const { name, email } = req.body;
+    if (!name || typeof name !== 'string' || name.trim() === '') {
+        return res.status(400).json({ error: 'name is required.' });
+    }
+    if (!email || !emailRegex.test(email)) {
+        return res.status(400).json({ error: 'A valid email is required.' });
+    }
+    next();
+}
+
 export function validateDeptRegister(req, res, next) {
-    const { departmentName, username, password, phone, description, email, organization_id } = req.body;
+    const { departmentName, username, password, phone, description, email, organization_id, referralCode } = req.body;
     if (!departmentName || departmentName.trim() === '') return res.status(400).json({ error: 'departmentName is required.' });
     if (!username || username.trim() === '') return res.status(400).json({ error: 'username is required.' });
     if (!password || password.trim() === '') return res.status(400).json({ error: 'password is required.' });
@@ -91,11 +102,13 @@ export function validateDeptRegister(req, res, next) {
     if (!description || description.trim() === '') return res.status(400).json({ error: 'description is required.' });
     if (!email || !emailRegex.test(email)) return res.status(400).json({ error: 'A valid email is required.' });
     if (!organization_id || organization_id.trim() === '') return res.status(400).json({ error: 'organization_id is required.' });
+    if (!referralCode || referralCode.trim() === '') return res.status(400).json({ error: 'referralCode is required.' });
     next();
 }
 
 export function validatePractitionerRegister(req, res, next) {
-    const { organization_id, job, staffId, email, phone, username, firstName, lastName, password } = req.body;
+    const { organization_id, job, staffId, email, phone, username, firstName, lastName, password, referralCode } = req.body;
+    if (!referralCode || referralCode.trim() === '') return res.status(400).json({ error: 'referralCode is required.' });
     if (!organization_id) return res.status(400).json({ error: 'organization_id is required.' });
     if (!job) return res.status(400).json({ error: 'job is required.' });
     if (!staffId) return res.status(400).json({ error: 'staffId is required.' });

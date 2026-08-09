@@ -71,6 +71,10 @@ class WhatsAppBotService {
                     try {
                         const code = await this.sock.requestPairingCode(phoneNumber);
                         console.log(`\n=================================\nPAIRING CODE: ${code}\n=================================\n`);
+                        if (this.saveCreds) {
+                            await this.saveCreds();
+                            console.log("Credentials saved to database after pairing code generation.");
+                        }
                     } catch (err) {
                         console.error("Pairing code error:", err.message);
                     }

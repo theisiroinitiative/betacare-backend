@@ -3,9 +3,9 @@ import departmentServices from './departmentServices.js';
 class DepartmentController {
     async create(req, res) {
         try {
-            // Protected: Approved HOD only (HOD practitioner ID in req.user.id)
-            const hodId = req.user.id;
-            const department = await departmentServices.createDepartment(hodId, req.body);
+            // Department registration using pre-authorized referral code
+            const hodId = req.user ? req.user.id : null;
+            const department = await departmentServices.createDepartment(req.body, hodId);
             return res.status(201).json({
                 message: 'Department registered successfully',
                 department
@@ -124,6 +124,20 @@ class DepartmentController {
             return res.status(200).json({ message });
         } catch (error) {
             console.error('Department logout controller error:', error);
+            return res.status(error.statusCode || 500).json({ error: error.message });
+        }
+    }
+
+    async generateReferral(req, res) {
+        try {
+            // Protected: Department or HOD
+            const requesterId = req.user.id;
+            const requesterRole = req.user.role; // 'department' or 'practitioner'
+            const { name, email } = req.body;
+            const result = await departmentServices.generateReferralCode(requesterId, requesterRole, { name, email });
+            return res.status(201).json(result);
+        } catch (error) {
+            console.error('Department generateReferral controller error:', error);
             return res.status(error.statusCode || 500).json({ error: error.message });
         }
     }

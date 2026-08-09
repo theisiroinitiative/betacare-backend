@@ -6,7 +6,8 @@ import {
 } from '../utils/middleware/authMiddleware.js';
 import {
     validateOrgRegister,
-    validateOrgLogin
+    validateOrgLogin,
+    validateGenerateReferral
 } from '../utils/middleware/validationMiddleware.js';
 
 const router = Router();
@@ -22,6 +23,7 @@ router.put('/update-status', authenticateAdmin, organizationController.updateSta
 router.put('/approve', authenticateAdmin, organizationController.approve);
 
 // Organization-protected routes
+router.post('/generate-referral', authenticateOrganization, validateGenerateReferral, organizationController.generateReferral);
 router.get('/summary', authenticateOrganization, organizationController.summary);
 router.get('/renew-token', organizationController.renewToken); // no auth middleware, verified via refresh token cookie
 router.put('/delete', authenticateOrganization, organizationController.deleteOrg);
