@@ -7,6 +7,7 @@ const router = Router();
 
 // Onboard user health profile (Stage 2 of onboarding)
 router.post('/onboard', authenticateUser, validateUserProfileOnboard, healthController.onboard);
+router.post('/resend-whatsapp-code', authenticateUser, healthController.resendWhatsappCode);
 
 // Demographics & Practitioner Linkage
 router.get('/', authenticateUser, healthController.getProfile);

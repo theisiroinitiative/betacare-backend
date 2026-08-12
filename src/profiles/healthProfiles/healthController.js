@@ -16,6 +16,21 @@ class HealthController {
         }
     }
 
+    async resendWhatsappCode(req, res) {
+        try {
+            const userId = req.user.userId;
+            const result = await healthService.resendWhatsappCode(userId);
+
+            return res.status(200).json({
+                code: result.code,
+                message: `send the code to our whatsapp agent @ ${result.botNumber}`
+            });
+        } catch (error) {
+            console.error('Resend WhatsApp code controller error:', error);
+            return res.status(error.statusCode || 500).json({ error: error.message });
+        }
+    }
+
     async getProfile(req, res) {
         try {
             const userId = req.user.userId;

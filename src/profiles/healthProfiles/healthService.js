@@ -79,6 +79,22 @@ class HealthService {
         }
     }
 
+    async resendWhatsappCode(userId) {
+        const profile = await UserProfile.findOne({ where: { userId } });
+        if (!profile) {
+            const err = new Error('User profile not found. Please complete health profile onboarding first.');
+            err.statusCode = 404;
+            throw err;
+        }
+
+        const whatsappCode = await otpService.storeWhatsappVerificationCode(profile.phoneNumber);
+
+        return {
+            code: whatsappCode,
+            botNumber: process.env.WHATSAPP_BOT_NUMBER || 'BetaCare Bot'
+        };
+    }
+
     async getProfileByUserId(userId) {
         const profile = await UserProfile.findOne({
             where: { userId },
