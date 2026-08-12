@@ -41,3 +41,4 @@ temp/
 .gemini/
 
 .npmrc
+src/utils/listModels.js

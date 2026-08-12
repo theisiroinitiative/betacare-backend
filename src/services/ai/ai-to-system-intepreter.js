@@ -203,19 +203,38 @@ export async function messageProcessor(message, phoneNumber) {
         // 2. Build system prompt with context
         const systemPrompt = buildSystemPrompt(userContext);
 
-        // 3. Call Gemini API
-        const model = genAI.getGenerativeModel(
-            {
-                model: process.env.GEMINI_MODEL || 'gemini-1.5-flash',
-                systemInstruction: {
-                    parts: [{ text: systemPrompt }]
-                }
-            },
-            { apiVersion: 'v1beta' }
-        );
+        // 3. Call Gemini API with verified available models
+        const candidateModels = process.env.GEMINI_MODEL
+            ? [process.env.GEMINI_MODEL, 'gemini-2.5-flash', 'gemini-flash-latest', 'gemini-2.5-pro']
+            : ['gemini-2.5-flash', 'gemini-flash-latest', 'gemini-2.5-pro', 'gemini-3.5-flash', 'gemini-2.5-flash-lite'];
 
-        const result = await model.generateContent(message);
-        const responseText = result.response.text();
+        let responseText = null;
+        let lastError = null;
+
+        for (const modelName of candidateModels) {
+            try {
+                const model = genAI.getGenerativeModel(
+                    {
+                        model: modelName,
+                        systemInstruction: {
+                            parts: [{ text: systemPrompt }]
+                        }
+                    },
+                    { apiVersion: 'v1beta' }
+                );
+
+                const result = await model.generateContent(message);
+                responseText = result.response.text();
+                if (responseText) break;
+            } catch (err) {
+                lastError = err;
+                console.warn(`[AI Interpreter] Model "${modelName}" failed: ${err.message}. Retrying with next model...`);
+            }
+        }
+
+        if (!responseText) {
+            throw lastError || new Error('All Gemini model fallbacks failed.');
+        }
 
         // 4. Parse actions from the response
         const { cleanText, actions } = parseActions(responseText);
