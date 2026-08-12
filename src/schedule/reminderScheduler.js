@@ -1,4 +1,4 @@
-import cron from 'node-cron';
+³import cron from 'node-cron';
 import { Op } from 'sequelize';
 import sequelize from '../config/dbConfig.js';
 import Reminder from './reminderModel.js';
@@ -24,8 +24,7 @@ async function processDueReminders() {
         console.log(`[ReminderScheduler] Heartbeat — checking due reminders at ${now.toISOString()}...`);
 
         const dueReminders = await Reminder.findAll({
-            where: {
-                scheduledAt: { [Op.lte]: now },
+            where:{
                 status: 'pending'
             }
         });
