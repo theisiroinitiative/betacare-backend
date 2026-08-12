@@ -1,3 +1,5 @@
+import { Op } from 'sequelize';
+import sequelize from '../../config/dbConfig.js';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { buildSystemPrompt } from './systemPrompt.js';
 import UserAuth from '../../auth/authModel.js';
@@ -15,10 +17,46 @@ const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
  * Fetch complete health context for a user by phone number.
  */
 async function getUserContext(phoneNumber) {
-    const user = await UserAuth.findOne({ where: { phoneNumber } });
-    if (!user) return null;
+    if (!phoneNumber) return null;
 
-    const profile = await UserProfile.findOne({ where: { userId: user.userId } });
+    const cleanDigits = phoneNumber.replace(/[^0-9]/g, '');
+
+    // 1. Try finding UserProfile directly by phoneNumber or clean digits
+    let profile = await UserProfile.findOne({
+        where: {
+            [Op.or]: [
+                { phoneNumber: phoneNumber },
+                ...(cleanDigits ? [
+                    sequelize.where(
+                        sequelize.fn('regexp_replace', sequelize.col('phoneNumber'), '[^0-9]', 'g'),
+                        cleanDigits
+                    )
+                ] : [])
+            ]
+        }
+    });
+
+    // 2. If profile not found directly, find UserAuth and lookup profile by userId
+    if (!profile) {
+        const user = await UserAuth.findOne({
+            where: {
+                [Op.or]: [
+                    { phoneNumber: phoneNumber },
+                    ...(cleanDigits ? [
+                        sequelize.where(
+                            sequelize.fn('regexp_replace', sequelize.col('phoneNumber'), '[^0-9]', 'g'),
+                            cleanDigits
+                        )
+                    ] : [])
+                ]
+            }
+        });
+
+        if (user) {
+            profile = await UserProfile.findOne({ where: { userId: user.userId } });
+        }
+    }
+
     if (!profile) return { profile: null, conditions: [], medications: [], recentVitals: [], recentMedicationLogs: [] };
 
     const conditions = await Condition.findAll({ where: { profileId: profile.id } });

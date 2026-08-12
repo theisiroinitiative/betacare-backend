@@ -22,15 +22,16 @@ router.get('/fetch', authenticateAdmin, practitionerController.fetch);
 router.delete('/delete', authenticateAdmin, practitionerController.deletePrac);
 router.get('/renew-token', practitionerController.renewToken); // Verified via refresh token cookie
 
-// Practitioner Patient Access (Practitioners only)
-router.get('/patient/:phoneNumber', authenticatePractitioner, practitionerController.getPatientProfile);
-router.post('/patient/:phoneNumber/condition', authenticatePractitioner, practitionerController.addPatientCondition);
-router.post('/patient/:phoneNumber/medication', authenticatePractitioner, practitionerController.addPatientMedication);
-router.get('/patient/:phoneNumber/medications', authenticatePractitioner, practitionerController.getPatientMedications);
-router.put('/patient/:phoneNumber/medication/:medicationId', authenticatePractitioner, practitionerController.updatePatientMedication);
-router.delete('/patient/:phoneNumber/medication/:medicationId', authenticatePractitioner, practitionerController.deletePatientMedication);
-router.get('/patient/:phoneNumber/medication-logs', authenticatePractitioner, practitionerController.getPatientMedicationLogs);
-router.get('/patient/:phoneNumber/observations', authenticatePractitioner, practitionerController.getPatientObservations);
-router.get('/patient/:phoneNumber/vitals', authenticatePractitioner, practitionerController.getPatientVitals);
+// Doctor Connections & Patient Access (Practitioners only)
+router.get('/connections', authenticatePractitioner, practitionerController.getConnections);
+router.get('/patient/:userId', authenticatePractitioner, practitionerController.getPatientProfile);
+router.post('/patient/:userId/condition', authenticatePractitioner, practitionerController.addPatientCondition);
+router.post('/patient/:userId/medication', authenticatePractitioner, practitionerController.addPatientMedication);
+router.get('/patient/:userId/medications', authenticatePractitioner, practitionerController.getPatientMedications);
+router.put('/patient/:userId/medication/:medicationId', authenticatePractitioner, practitionerController.updatePatientMedication);
+router.delete('/patient/:userId/medication/:medicationId', authenticatePractitioner, practitionerController.deletePatientMedication);
+router.get('/patient/:userId/medication-logs', authenticatePractitioner, practitionerController.getPatientMedicationLogs);
+router.get('/patient/:userId/observations', authenticatePractitioner, practitionerController.getPatientObservations);
+router.get('/patient/:userId/vitals', authenticatePractitioner, practitionerController.getPatientVitals);
 
 export default router;

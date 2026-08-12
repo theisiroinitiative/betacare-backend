@@ -23,6 +23,7 @@ import VitalLog from './profiles/vitalLog/vitalLogModel.js';
 import WhatsAppJidMapping from './auth/whatsapp-auth/whatsappMappingModel.js';
 import Observation from './profiles/observation/observationModel.js';
 import Reminder from './schedule/reminderModel.js';
+import Connection from './profiles/connections/connectionModel.js';
 import { startReminderScheduler } from './schedule/reminderScheduler.js';
 import whatsappBotService from './agent/agentServices.js';
 
@@ -95,6 +96,12 @@ Observation.belongsTo(UserProfile, { foreignKey: 'profileId' });
 // 8. UserProfile & Reminder
 UserProfile.hasMany(Reminder, { foreignKey: 'profileId', onDelete: 'CASCADE' });
 Reminder.belongsTo(UserProfile, { foreignKey: 'profileId' });
+
+// 9. UserProfile, Practitioner & Connection
+UserProfile.hasMany(Connection, { foreignKey: 'profileId', onDelete: 'CASCADE' });
+Connection.belongsTo(UserProfile, { foreignKey: 'profileId' });
+Practitioner.hasMany(Connection, { foreignKey: 'practitionerId', onDelete: 'CASCADE' });
+Connection.belongsTo(Practitioner, { foreignKey: 'practitionerId' });
 
 // Database Connection & Sync
 async function initializeDatabase() {

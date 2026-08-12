@@ -51,14 +51,24 @@ class HealthController {
         }
     }
 
+    async getPractitionerInfo(req, res) {
+        try {
+            const email = req.query.email;
+            const practitioner = await healthService.getPractitionerInfoByEmail(email);
+            return res.status(200).json(practitioner);
+        } catch (error) {
+            return res.status(error.statusCode || 500).json({ error: error.message });
+        }
+    }
+
     async linkPractitioner(req, res) {
         try {
             const userId = req.user.userId;
-            const { practitionerId } = req.body;
+            const { practitionerId, durationHours, expiresAt } = req.body;
             if (!practitionerId) return res.status(400).json({ error: 'practitionerId is required.' });
 
-            const profile = await healthService.linkPractitioner(userId, practitionerId);
-            return res.status(200).json({ message: 'Practitioner linked successfully.', profile });
+            const result = await healthService.linkPractitioner(userId, practitionerId, { durationHours, expiresAt });
+            return res.status(200).json(result);
         } catch (error) {
             return res.status(error.statusCode || 500).json({ error: error.message });
         }
@@ -70,8 +80,19 @@ class HealthController {
             const { practitionerId } = req.body;
             if (!practitionerId) return res.status(400).json({ error: 'practitionerId is required.' });
 
-            const profile = await healthService.unlinkPractitioner(userId, practitionerId);
-            return res.status(200).json({ message: 'Practitioner unlinked successfully.', profile });
+            const result = await healthService.unlinkPractitioner(userId, practitionerId);
+            return res.status(200).json(result);
+        } catch (error) {
+            return res.status(error.statusCode || 500).json({ error: error.message });
+        }
+    }
+
+    async getConnections(req, res) {
+        try {
+            const userId = req.user.userId;
+            const statusFilter = req.query.status || 'all';
+            const connections = await healthService.getPatientConnections(userId, statusFilter);
+            return res.status(200).json(connections);
         } catch (error) {
             return res.status(error.statusCode || 500).json({ error: error.message });
         }

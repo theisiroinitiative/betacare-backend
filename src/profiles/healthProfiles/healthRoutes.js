@@ -12,8 +12,10 @@ router.post('/resend-whatsapp-code', authenticateUser, healthController.resendWh
 // Demographics & Practitioner Linkage
 router.get('/', authenticateUser, healthController.getProfile);
 router.put('/', authenticateUser, healthController.updateProfile);
+router.get('/practitioner-info', authenticateUser, healthController.getPractitionerInfo);
 router.post('/link-practitioner', authenticateUser, healthController.linkPractitioner);
 router.post('/unlink-practitioner', authenticateUser, healthController.unlinkPractitioner);
+router.get('/connections', authenticateUser, healthController.getConnections);
 
 // Conditions CRUD
 router.get('/conditions', authenticateUser, healthController.getConditions);

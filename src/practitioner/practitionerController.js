@@ -1,5 +1,6 @@
 import practitionerServices from './practitionerServices.js';
 import healthService from '../profiles/healthProfiles/healthService.js';
+import Connection from '../profiles/connections/connectionModel.js';
 
 class PractitionerController {
     async register(req, res) {
@@ -140,27 +141,54 @@ class PractitionerController {
         }
     }
 
-    async getLinkedPatientProfile(phoneNumber, practitionerId) {
-        const profile = await healthService.getProfileByPhoneNumber(phoneNumber);
+    async getConnections(req, res) {
+        try {
+            const practitionerId = req.user.id;
+            const statusFilter = req.query.status || 'all';
+            const connections = await practitionerServices.getPractitionerConnections(practitionerId, statusFilter);
+            return res.status(200).json(connections);
+        } catch (error) {
+            return res.status(error.statusCode || 500).json({ error: error.message });
+        }
+    }
+
+    async getLinkedPatientProfile(targetUserId, practitionerId) {
+        const profile = await healthService.getProfileByUserId(targetUserId);
         if (!profile) {
             const err = new Error('Patient profile not found.');
             err.statusCode = 404;
             throw err;
         }
 
-        const linked = profile.linkedPractitioners || [];
-        if (!linked.includes(practitionerId)) {
+        const connection = await Connection.findOne({
+            where: { profileId: profile.id, practitionerId }
+        });
+
+        if (!connection) {
             const err = new Error('Access denied. You are not linked to this patient.');
             err.statusCode = 403;
             throw err;
         }
+
+        const now = new Date();
+        if (connection.status === 'active' && connection.expiresAt < now) {
+            connection.status = 'expired';
+            await connection.save();
+        }
+
+        if (connection.status !== 'active') {
+            const err = new Error(`Access denied. Connection with this patient is ${connection.status}.`);
+            err.statusCode = 403;
+            throw err;
+        }
+
         return profile;
     }
 
     async getPatientProfile(req, res) {
         try {
             const practitionerId = req.user.id;
-            const profile = await this.getLinkedPatientProfile(req.params.phoneNumber, practitionerId);
+            const profile = await this.getLinkedPatientProfile(req.params.userId, practitionerId);
             return res.status(200).json(profile);
         } catch (error) {
             return res.status(error.statusCode || 500).json({ error: error.message });
@@ -170,7 +198,7 @@ class PractitionerController {
     async addPatientCondition(req, res) {
         try {
             const practitionerId = req.user.id;
-            const profile = await this.getLinkedPatientProfile(req.params.phoneNumber, practitionerId);
+            const profile = await this.getLinkedPatientProfile(req.params.userId, practitionerId);
             const condition = await healthService.addCondition(profile.id, req.body);
             return res.status(201).json({ message: 'Condition added successfully by practitioner.', condition });
         } catch (error) {
@@ -181,7 +209,7 @@ class PractitionerController {
     async addPatientMedication(req, res) {
         try {
             const practitionerId = req.user.id;
-            const profile = await this.getLinkedPatientProfile(req.params.phoneNumber, practitionerId);
+            const profile = await this.getLinkedPatientProfile(req.params.userId, practitionerId);
             const medication = await healthService.addMedication(profile.id, req.body);
             return res.status(201).json({ message: 'Medication prescribed successfully by practitioner.', medication });
         } catch (error) {
@@ -192,7 +220,7 @@ class PractitionerController {
     async getPatientMedications(req, res) {
         try {
             const practitionerId = req.user.id;
-            const profile = await this.getLinkedPatientProfile(req.params.phoneNumber, practitionerId);
+            const profile = await this.getLinkedPatientProfile(req.params.userId, practitionerId);
             const medications = await healthService.getMedications(profile.id);
             return res.status(200).json(medications);
         } catch (error) {
@@ -203,7 +231,7 @@ class PractitionerController {
     async updatePatientMedication(req, res) {
         try {
             const practitionerId = req.user.id;
-            const profile = await this.getLinkedPatientProfile(req.params.phoneNumber, practitionerId);
+            const profile = await this.getLinkedPatientProfile(req.params.userId, practitionerId);
             const medication = await healthService.updateMedication(profile.id, req.params.medicationId, req.body);
             return res.status(200).json({ message: 'Medication updated successfully by practitioner.', medication });
         } catch (error) {
@@ -214,7 +242,7 @@ class PractitionerController {
     async deletePatientMedication(req, res) {
         try {
             const practitionerId = req.user.id;
-            const profile = await this.getLinkedPatientProfile(req.params.phoneNumber, practitionerId);
+            const profile = await this.getLinkedPatientProfile(req.params.userId, practitionerId);
             await healthService.deleteMedication(profile.id, req.params.medicationId);
             return res.status(200).json({ message: 'Medication deleted successfully by practitioner.' });
         } catch (error) {
@@ -225,7 +253,7 @@ class PractitionerController {
     async getPatientMedicationLogs(req, res) {
         try {
             const practitionerId = req.user.id;
-            const profile = await this.getLinkedPatientProfile(req.params.phoneNumber, practitionerId);
+            const profile = await this.getLinkedPatientProfile(req.params.userId, practitionerId);
             const logs = await healthService.getMedicationLogs(profile.id);
             return res.status(200).json(logs);
         } catch (error) {
@@ -236,7 +264,7 @@ class PractitionerController {
     async getPatientObservations(req, res) {
         try {
             const practitionerId = req.user.id;
-            const profile = await this.getLinkedPatientProfile(req.params.phoneNumber, practitionerId);
+            const profile = await this.getLinkedPatientProfile(req.params.userId, practitionerId);
             const observations = await healthService.getObservations(profile.id);
             return res.status(200).json(observations);
         } catch (error) {
@@ -247,7 +275,7 @@ class PractitionerController {
     async getPatientVitals(req, res) {
         try {
             const practitionerId = req.user.id;
-            const profile = await this.getLinkedPatientProfile(req.params.phoneNumber, practitionerId);
+            const profile = await this.getLinkedPatientProfile(req.params.userId, practitionerId);
             const vitals = await healthService.getVitals(profile.id);
             return res.status(200).json(vitals);
         } catch (error) {

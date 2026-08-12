@@ -185,7 +185,7 @@ class AuthServices {
         const accessToken = signAccessToken(userData);
         const refreshToken = await signRefreshToken(userData); // storing in db inside signRefreshToken
 
-        return { accessToken, refreshToken, accountSetupStage  };
+        return { accessToken, refreshToken, accountSetupStage, isOnboarded: user.isOnboarded };
     }
 
     async renewAccessToken(refreshTokenString) {

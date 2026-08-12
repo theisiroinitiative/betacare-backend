@@ -39,6 +39,11 @@ const UserAuth = sequelize.define('auths', {
     isWhatsappVerified: {
         type: DataTypes.BOOLEAN,
         defaultValue: true
+    },
+    isOnboarded: {
+        type: DataTypes.BOOLEAN,
+        allowNull: false,
+        defaultValue: false
     }
 }, {
     timestamps: true

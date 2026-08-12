@@ -1,4 +1,5 @@
 import UserProfile from './healthModel.js';
+import UserAuth from '../../auth/authModel.js';
 import Condition from '../conditions/conditionModel.js';
 import Medication from '../medications/medicationModel.js';
 import VitalLog from '../vitalLog/vitalLogModel.js';
@@ -6,6 +7,7 @@ import Observation from '../observation/observationModel.js';
 import Reminder from '../../schedule/reminderModel.js';
 import MedicationLog from '../medicationLogs/medicationLogModel.js';
 import Practitioner from '../../practitioner/practitionerModel.js';
+import Connection from '../connections/connectionModel.js';
 import sequelize from '../../config/dbConfig.js';
 import otpService from '../../services/otpServices/otpService.js';
 
@@ -62,6 +64,13 @@ class HealthService {
                     endDate: m.endDate
                 }));
                 await Medication.bulkCreate(medicationsData, { transaction });
+            }
+
+            // Check if user is already WhatsApp verified to update isOnboarded status
+            const userAuth = await UserAuth.findByPk(userId, { transaction });
+            if (userAuth && userAuth.isWhatsappVerified) {
+                userAuth.isOnboarded = true;
+                await userAuth.save({ transaction });
             }
 
             await transaction.commit();
@@ -152,7 +161,28 @@ class HealthService {
         return profile;
     }
 
-    async linkPractitioner(userId, practitionerId) {
+    async getPractitionerInfoByEmail(email) {
+        if (!email || typeof email !== 'string' || email.trim() === '') {
+            const err = new Error('Email is required.');
+            err.statusCode = 400;
+            throw err;
+        }
+
+        const practitioner = await Practitioner.findOne({
+            where: { email: email.trim().toLowerCase(), status: 'approved' },
+            attributes: ['id', 'firstName', 'lastName', 'email', 'phone', 'specialization', 'qualification', 'mdcnNumber', 'employmentStatus']
+        });
+
+        if (!practitioner) {
+            const err = new Error('Verified practitioner with this email address was not found.');
+            err.statusCode = 404;
+            throw err;
+        }
+
+        return practitioner;
+    }
+
+    async linkPractitioner(userId, practitionerId, options = {}) {
         const profile = await UserProfile.findOne({ where: { userId } });
         if (!profile) {
             const err = new Error('User profile not found.');
@@ -161,20 +191,43 @@ class HealthService {
         }
 
         const practitioner = await Practitioner.findByPk(practitionerId);
-        if (!practitioner) {
-            const err = new Error('Practitioner not found.');
+        if (!practitioner || practitioner.status !== 'approved') {
+            const err = new Error('Approved practitioner not found.');
             err.statusCode = 404;
             throw err;
         }
 
-        let list = profile.linkedPractitioners || [];
-        if (!list.includes(practitionerId)) {
-            list = [...list, practitionerId];
-            profile.linkedPractitioners = list;
-            await profile.save();
+        let expiresAt;
+        if (options.expiresAt) {
+            expiresAt = new Date(options.expiresAt);
+        } else if (options.durationHours && !isNaN(Number(options.durationHours))) {
+            expiresAt = new Date(Date.now() + Number(options.durationHours) * 3600 * 1000);
+        } else {
+            // Default 24 hours
+            expiresAt = new Date(Date.now() + 24 * 3600 * 1000);
         }
 
-        return profile;
+        let connection = await Connection.findOne({
+            where: { profileId: profile.id, practitionerId }
+        });
+
+        if (connection) {
+            connection.status = 'active';
+            connection.expiresAt = expiresAt;
+            await connection.save();
+        } else {
+            connection = await Connection.create({
+                profileId: profile.id,
+                practitionerId,
+                status: 'active',
+                expiresAt
+            });
+        }
+
+        return {
+            message: 'Practitioner linked successfully.',
+            connection
+        };
     }
 
     async unlinkPractitioner(userId, practitionerId) {
@@ -185,14 +238,56 @@ class HealthService {
             throw err;
         }
 
-        let list = profile.linkedPractitioners || [];
-        if (list.includes(practitionerId)) {
-            list = list.filter(id => id !== practitionerId);
-            profile.linkedPractitioners = list;
-            await profile.save();
+        const connection = await Connection.findOne({
+            where: { profileId: profile.id, practitionerId }
+        });
+
+        if (!connection || connection.status === 'revoked') {
+            const err = new Error('No active connection found with this practitioner.');
+            err.statusCode = 404;
+            throw err;
         }
 
-        return profile;
+        connection.status = 'revoked';
+        connection.expiresAt = new Date();
+        await connection.save();
+
+        return {
+            message: 'Practitioner unlinked successfully.',
+            connection
+        };
+    }
+
+    async getPatientConnections(userId, statusFilter = 'all') {
+        const profile = await UserProfile.findOne({ where: { userId } });
+        if (!profile) {
+            const err = new Error('User profile not found.');
+            err.statusCode = 404;
+            throw err;
+        }
+
+        const connections = await Connection.findAll({
+            where: { profileId: profile.id },
+            include: [{
+                model: Practitioner,
+                attributes: ['id', 'firstName', 'lastName', 'email', 'phone', 'specialization', 'qualification', 'mdcnNumber']
+            }],
+            order: [['createdAt', 'DESC']]
+        });
+
+        const now = new Date();
+        const updatedConnections = [];
+        for (const conn of connections) {
+            if (conn.status === 'active' && conn.expiresAt < now) {
+                conn.status = 'expired';
+                await conn.save();
+            }
+            if (statusFilter === 'all' || conn.status === statusFilter) {
+                updatedConnections.push(conn);
+            }
+        }
+
+        return updatedConnections;
     }
 
     // Condition CRUD

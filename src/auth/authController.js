@@ -79,7 +79,7 @@ class AuthController {
     async login(req, res) {
         try {
             const { email, password } = req.body;
-            const { accessToken, refreshToken, accountSetupStage } = await authServices.login({ email, password });
+            const { accessToken, refreshToken, accountSetupStage, isOnboarded } = await authServices.login({ email, password });
 
             // Set HttpOnly cookies with SameSite=None and Secure=True
             res.cookie('access_token', accessToken, {
@@ -96,7 +96,7 @@ class AuthController {
                 maxAge: 4 * 60 * 60 * 1000 // 4 hours
             });
 
-            return res.status(200).json({ message: 'Logged in successfully', accountStage: accountSetupStage });
+            return res.status(200).json({ message: 'Logged in successfully', accountStage: accountSetupStage, isOnboarded });
         } catch (error) {
             console.error('Login controller error:', error);
             return res.status(error.statusCode || 500).json({ error: error.message });

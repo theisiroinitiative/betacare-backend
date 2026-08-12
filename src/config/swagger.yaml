@@ -211,7 +211,23 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/SuccessResponse'
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Logged in successfully
+                  accountStage:
+                    type: object
+                    properties:
+                      emailVerified:
+                        type: boolean
+                        example: true
+                      onboardingComplete:
+                        type: boolean
+                        example: true
+                  isOnboarded:
+                    type: boolean
+                    example: true
           headers:
             Set-Cookie:
               schema:
@@ -455,12 +471,76 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
 
+  /auth/user/profile/practitioner-info:
+    get:
+      tags:
+        - Patient Profile CRUD
+      summary: Fetch verified practitioner profile by email
+      description: Retrieve verified doctor profile details for a patient to inspect before confirming a connection.
+      security:
+        - AccessTokenAuth: []
+      parameters:
+        - name: email
+          in: query
+          required: true
+          description: Verified doctor email address.
+          schema:
+            type: string
+            format: email
+            example: dr_adewale@example.com
+      responses:
+        '200':
+          description: Practitioner info retrieved successfully.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                    format: uuid
+                  firstName:
+                    type: string
+                    example: Adewale
+                  lastName:
+                    type: string
+                    example: Alabi
+                  email:
+                    type: string
+                    format: email
+                  phone:
+                    type: string
+                  specialization:
+                    type: string
+                  qualification:
+                    type: string
+                  mdcnNumber:
+                    type: string
+        '400':
+          description: Email is required.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Verified practitioner with this email address was not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
   /auth/user/profile/link-practitioner:
     post:
       tags:
         - Patient Profile CRUD
-      summary: Link a medical practitioner to user profile
-      description: Link a practitioner ID to enable them to view and manage health records.
+      summary: Link a medical practitioner to user profile with an expiry duration
+      description: Establish a time-bound active connection between patient and doctor.
       security:
         - AccessTokenAuth: []
       requestBody:
@@ -468,7 +548,22 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/LinkPractitioner'
+              type: object
+              required: [practitionerId]
+              properties:
+                practitionerId:
+                  type: string
+                  format: uuid
+                  example: "9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d"
+                durationHours:
+                  type: integer
+                  description: Number of hours until connection expires (defaults to 24 hours).
+                  example: 24
+                expiresAt:
+                  type: string
+                  format: date-time
+                  description: Optional explicit expiry timestamp ISO string.
+                  example: "2026-08-15T12:00:00.000Z"
       responses:
         '200':
           description: Practitioner successfully linked.
@@ -499,8 +594,8 @@ paths:
     post:
       tags:
         - Patient Profile CRUD
-      summary: Unlink a medical practitioner from user profile
-      description: Remove linking for a practitioner to revoke access to health records.
+      summary: Unlink a medical practitioner from user profile early
+      description: Revoke connection for a practitioner before its scheduled expiration.
       security:
         - AccessTokenAuth: []
       requestBody:
@@ -508,7 +603,13 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/LinkPractitioner'
+              type: object
+              required: [practitionerId]
+              properties:
+                practitionerId:
+                  type: string
+                  format: uuid
+                  example: "9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d"
       responses:
         '200':
           description: Practitioner successfully unlinked.
@@ -522,6 +623,45 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /auth/user/profile/connections:
+    get:
+      tags:
+        - Patient Profile CRUD
+      summary: Fetch patient's practitioner connections
+      description: Retrieve existing and expired doctor connections for the patient.
+      security:
+        - AccessTokenAuth: []
+      parameters:
+        - name: status
+          in: query
+          required: false
+          description: Filter connections by status (active, expired, revoked, or all).
+          schema:
+            type: string
+            enum: [active, expired, revoked, all]
+            example: active
+      responses:
+        '200':
+          description: List of connections retrieved.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Connection'
         '401':
           description: Unauthorized.
           content:
@@ -2648,76 +2788,77 @@ components:
           enum: [active, pending, suspended]
           example: active
 
-    OrganizationApprove:
+    Connection:
       type: object
-      required: [organization_id, username]
       properties:
-        organization_id:
+        id:
           type: string
           format: uuid
-          example: "9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d"
-        username:
+        profileId:
           type: string
-          example: city_hospital_admin
-
-    OrganizationSummary:
-      type: object
-      properties:
-        departments:
-          type: array
-          items:
-            type: object
-            properties:
-              id:
-                type: string
-                format: uuid
-              departmentName:
-                type: string
-              description:
-                type: string
-              phone:
-                type: string
-              email:
-                type: string
-                format: email
-              status:
-                type: string
-                enum: [pending, approved]
-        totalPractitioners:
-          type: integer
-          example: 12
-
-    GenerateReferralInput:
-      type: object
-      required:
-        - name
-        - email
-      properties:
-        name:
+          format: uuid
+        practitionerId:
           type: string
-          description: Target Department or Practitioner name.
-          example: Pediatrics Department
-        email:
+          format: uuid
+        status:
           type: string
-          format: email
-          description: Target Department or Practitioner email address.
-          example: pediatrics@cityhospital.com
-
-    ReferralCodeResponse:
-      type: object
-      properties:
-        message:
-          type: string
-          example: Referral code generated and sent successfully
-        referralCode:
-          type: string
-          example: REF-ORG-A1B2C3D4
-        deleteAt:
+          enum: [active, expired, revoked]
+          example: active
+        expiresAt:
           type: string
           format: date-time
-          example: "2026-08-16T03:00:00.000Z"
+          example: "2026-08-13T15:00:00.000Z"
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        Practitioner:
+          type: object
+          properties:
+            id:
+              type: string
+              format: uuid
+            firstName:
+              type: string
+            lastName:
+              type: string
+            email:
+              type: string
+              format: email
+            phone:
+              type: string
+            specialization:
+              type: string
+            qualification:
+              type: string
+            mdcnNumber:
+              type: string
+        UserProfile:
+          type: object
+          properties:
+            id:
+              type: string
+              format: uuid
+            userId:
+              type: string
+              format: uuid
+            firstName:
+              type: string
+            lastName:
+              type: string
+            gender:
+              type: string
+            dateOfBirth:
+              type: string
+            phoneNumber:
+              type: string
+            bloodGroup:
+              type: string
+            genotype:
+              type: string
 
-    DepartmentRegister:
     PractitionerRegister:
       type: object
       required:
@@ -2762,15 +2903,6 @@ components:
           type: string
           enum: [full_time, part_time, locum, intern, volunteer]
           example: full_time
-      type: object
-      required: [username, password]
-      properties:
-        username:
-          type: string
-          example: peds_dept
-        password:
-          type: string
-          example: peds_pass_123
 
     PractitionerApproveRejectInput:
       type: object
@@ -2877,8 +3009,8 @@ components:
         message:
           type: string
           example: Practitioner linked successfully.
-        profile:
-          $ref: '#/components/schemas/UserProfile'
+        connection:
+          $ref: '#/components/schemas/Connection'
 
     UnlinkPractitionerResponse:
       type: object
@@ -2886,8 +3018,8 @@ components:
         message:
           type: string
           example: Practitioner unlinked successfully.
-        profile:
-          $ref: '#/components/schemas/UserProfile'
+        connection:
+          $ref: '#/components/schemas/Connection'
 
     ErrorResponse:
       type: object

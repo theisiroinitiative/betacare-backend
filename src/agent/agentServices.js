@@ -2,6 +2,7 @@ import makeWASocket, { DisconnectReason } from '@whiskeysockets/baileys';
 import pino from 'pino';
 import bcrypt from 'bcryptjs';
 import UserAuth from '../auth/authModel.js';
+import UserProfile from '../profiles/healthProfiles/healthModel.js';
 import WhatsAppJidMapping from '../auth/whatsapp-auth/whatsappMappingModel.js';
 import { messageProcessor } from '../services/ai/ai-to-system-intepreter.js';
 import { usePostgresAuthState, WhatsAppSession } from './agentModel.js';
@@ -151,6 +152,10 @@ class WhatsAppBotService {
                 const user = await UserAuth.findOne({ where: { phoneNumber } });
                 if (user) {
                     user.isWhatsappVerified = true;
+                    const profile = await UserProfile.findOne({ where: { userId: user.userId } });
+                    if (profile) {
+                        user.isOnboarded = true;
+                    }
                     await user.save();
                 }
 
@@ -182,13 +187,10 @@ class WhatsAppBotService {
             }
 
             const user = await UserAuth.findOne({ where: { phoneNumber: mapping.phoneNumber } });
-            if (!user) {
-                await this.sendMessage(senderJid, 'User account not found. Please register on the web platform.');
-                return;
-            }
+            const targetPhone = user ? user.phoneNumber : mapping.phoneNumber;
 
             // Process message via AI interpreter
-            const reply = await messageProcessor(text, user.phoneNumber);
+            const reply = await messageProcessor(text, targetPhone);
 
             // Send reply back
             await this.sendMessage(senderJid, reply);

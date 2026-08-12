@@ -2,6 +2,8 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { Op } from 'sequelize';
 import Practitioner from './practitionerModel.js';
+import UserProfile from '../profiles/healthProfiles/healthModel.js';
+import Connection from '../profiles/connections/connectionModel.js';
 import emailService from '../services/emailServices/emailService.js';
 import redisClient from '../config/redisConfig.js';
 
@@ -169,6 +171,31 @@ class PractitionerServices {
 
         await practitioner.destroy();
         return 'practitioner deleted successfully';
+    }
+
+    async getPractitionerConnections(practitionerId, statusFilter = 'all') {
+        const connections = await Connection.findAll({
+            where: { practitionerId },
+            include: [{
+                model: UserProfile,
+                attributes: ['id', 'userId', 'firstName', 'lastName', 'gender', 'dateOfBirth', 'phoneNumber', 'bloodGroup', 'genotype']
+            }],
+            order: [['createdAt', 'DESC']]
+        });
+
+        const now = new Date();
+        const updatedConnections = [];
+        for (const conn of connections) {
+            if (conn.status === 'active' && conn.expiresAt < now) {
+                conn.status = 'expired';
+                await conn.save();
+            }
+            if (statusFilter === 'all' || conn.status === statusFilter) {
+                updatedConnections.push(conn);
+            }
+        }
+
+        return updatedConnections;
     }
 }
 
