@@ -1147,668 +1147,14 @@ paths:
   /organization/fetch:
     get:
       tags:
-        - Organization Management
-      summary: Fetch paginated organizations (Admin only)
-      description: Retrieve a paginated list of registered organizations with filtering.
-      security:
-        - AccessTokenAuth: []
-      parameters:
-        - name: page
-          in: query
-          required: false
-          description: Page number for pagination (defaults to 1).
-          schema:
-            type: integer
-            example: 1
-        - name: status
-          in: query
-          required: false
-          schema:
-            type: string
-            enum: [pending, active, suspended]
-        - name: type
-          in: query
-          required: false
-          schema:
-            type: string
-        - name: state
-          in: query
-          required: false
-          schema:
-            type: string
-        - name: ownership
-          in: query
-          required: false
-          schema:
-            type: string
-        - name: dateJoined
-          in: query
-          required: false
-          description: Filters organizations joined on or after this date.
-          schema:
-            type: string
-            format: date
-      responses:
-        '200':
-          description: List of organizations retrieved.
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  organizations:
-                    type: array
-                    items:
-                      $ref: '#/components/schemas/Organization'
-                  total:
-                    type: integer
-                    example: 25
-                  pages:
-                    type: integer
-                    example: 3
-                  currentPage:
-                    type: integer
-                    example: 1
-        '401':
-          description: Unauthorized.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '403':
-          description: Forbidden. Administrator privileges required.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '500':
-          description: Internal server error.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
 
-  /organization/update-status:
-    put:
-      tags:
-        - Organization Management
-      summary: Update organization status (Admin only)
-      description: Update an organization's state (active, pending, suspended).
-      security:
-        - AccessTokenAuth: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/OrganizationUpdateStatus'
-      responses:
-        '200':
-          description: Status updated successfully.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/SuccessResponse'
-        '401':
-          description: Unauthorized.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '403':
-          description: Forbidden. Administrator privileges required.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '404':
-          description: Organization not found.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '500':
-          description: Internal server error.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-
-  /organization/approve:
-    put:
-      tags:
-        - Organization Management
-      summary: Approve organization registration (Admin only)
-      description: Approve a pending organization, assign an admin username, and email them a generated password.
-      security:
-        - AccessTokenAuth: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/OrganizationApprove'
-      responses:
-        '200':
-          description: Organization approved, login details emailed.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/SuccessResponse'
-        '400':
-          description: Username is already taken.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '401':
-          description: Unauthorized.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '403':
-          description: Forbidden. Administrator privileges required.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '404':
-          description: Organization not found.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '500':
-          description: Internal server error.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-
-  /organization/summary:
-    get:
-      tags:
-        - Organization Management
-      summary: Get organization departments and practitioner count (Org manager only)
-      description: Retrieve dashboard summary for the authenticated organization.
-      security:
-        - AccessTokenAuth: []
-      parameters:
-        - name: organization_id
-          in: query
-          required: false
-          description: The UUID of the organization (defaults to authenticated organization).
-          schema:
-            type: string
-            format: uuid
-      responses:
-        '200':
-          description: Summary data returned.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/OrganizationSummary'
-        '401':
-          description: Unauthorized.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '403':
-          description: Forbidden. Access denied. You can only query your own organization.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '500':
-          description: Internal server error.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-
-  /organization/renew-token:
-    get:
-      tags:
-        - Organization Management
-      summary: Renew organization access token
-      description: Renew organization `access_token` using the cookie `refresh_token`.
-      responses:
-        '200':
-          description: Token renewed successfully.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/SuccessResponse'
-          headers:
-            Set-Cookie:
-              schema:
-                type: string
-                example: access_token=new_jwt_access_token...; Path=/; HttpOnly; Secure; SameSite=None
-        '401':
-          description: Unauthorized. Missing or invalid refresh token.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '500':
-          description: Internal server error.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-
-  /organization/logout:
-    put:
-      tags:
-        - Organization Management
-      summary: Log out organization
-      description: Log out the organization and clear authorization cookies.
-      responses:
-        '200':
-          description: Logged out successfully.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/SuccessResponse'
-        '500':
-          description: Internal server error.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-
-  /organization/delete:
-    put:
-      tags:
-        - Organization Management
-      summary: Delete organization and cascade departments/practitioners (Org manager only)
-      description: Delete organization account permanently. Cascade deletes departments and practitioners.
-      security:
-        - AccessTokenAuth: []
-      responses:
-        '200':
-          description: Organization deleted successfully.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/SuccessResponse'
-        '401':
-          description: Unauthorized.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '403':
-          description: Forbidden. Organization credentials required.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '500':
-          description: Internal server error.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-
-  /organization/generate-referral:
-    post:
-      tags:
-        - Organization Management
-      summary: Generate referral code for department signup (Org only)
-      description: Generate a 7-day expiring referral code for a target department and email it.
-      security:
-        - AccessTokenAuth: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/GenerateReferralInput'
-      responses:
-        '201':
-          description: Referral code generated and emailed successfully.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ReferralCodeResponse'
-        '400':
-          description: Validation error.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '401':
-          description: Unauthorized. Access token missing or invalid.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '403':
-          description: Forbidden. Active organization credentials required.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '500':
-          description: Internal server error.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-
-  /department/new:
-    post:
-      tags:
-        - Department Onboarding
-      summary: Register a new department under an organization
-      description: Register a new department using a pre-authorized 7-day expiring referral code generated by an organization.
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/DepartmentRegister'
-      responses:
-        '201':
-          description: Department registered successfully in approved status.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/DepartmentRegisterResponse'
-        '400':
-          description: Validation error, invalid/expired referral code, or username already taken.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '404':
-          description: Organization not found.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '500':
-          description: Internal server error.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-
-  /department/generate-referral:
-    post:
-      tags:
-        - Department Onboarding
-      summary: Generate referral code for practitioner signup (Department or HOD only)
-      description: Generate a 7-day expiring referral code for a target practitioner and email it.
-      security:
-        - AccessTokenAuth: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/GenerateReferralInput'
-      responses:
-        '201':
-          description: Referral code generated and emailed successfully.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ReferralCodeResponse'
-        '400':
-          description: Validation error.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '401':
-          description: Unauthorized. Access token missing or invalid.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '403':
-          description: Forbidden. Approved Department or HOD credentials required.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '500':
-          description: Internal server error.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-
-  /department/approve:
-    put:
-      tags:
-        - Department Onboarding
-      summary: Approve a registered department (Org only)
-      description: Approve a pending department. Organization credentials required.
-      security:
-        - AccessTokenAuth: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/DepartmentApprove'
-      responses:
-        '200':
-          description: Department approved successfully.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/SuccessResponse'
-        '401':
-          description: Unauthorized.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '403':
-          description: Forbidden. Active organization credentials required.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '404':
-          description: Department not found.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '500':
-          description: Internal server error.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-
-  /department/fetch:
-    get:
-      tags:
-        - Department Onboarding
-      summary: Fetch departments under the organization (Org only)
-      description: Retrieve departments belonging to the authenticated organization.
-      security:
-        - AccessTokenAuth: []
-      parameters:
-        - name: status
-          in: query
-          required: false
-          schema:
-            type: string
-            enum: [pending, approved]
-        - name: dateJoined
-          in: query
-          required: false
-          schema:
-            type: string
-            format: date
-      responses:
-        '200':
-          description: List of departments.
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/Department'
-        '401':
-          description: Unauthorized.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '403':
-          description: Forbidden. Active organization credentials required.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '500':
-          description: Internal server error.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-
-  /department/delete:
-    delete:
-      tags:
-        - Department Onboarding
-      summary: Delete department and cascade practitioners (Org or HOD only)
-      description: Delete department permanently. Cascade deletes practitioners.
-      security:
-        - AccessTokenAuth: []
-      parameters:
-        - name: department_id
-          in: query
-          required: true
-          schema:
-            type: string
-            format: uuid
-      responses:
-        '200':
-          description: Department deleted successfully.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/SuccessResponse'
-        '401':
-          description: Unauthorized.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '403':
-          description: Forbidden. Access denied.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '500':
-          description: Internal server error.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-
-  /department/login:
-    post:
-      tags:
-        - Department Onboarding
-      summary: Department login
-      description: Authenticate a department user. Sets `access_token` and `refresh_token` cookies.
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/DepartmentLogin'
-      responses:
-        '200':
-          description: Login successful.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/SuccessResponse'
-        '401':
-          description: Invalid username or password.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '403':
-          description: Department is not approved or is inactive.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '500':
-          description: Internal server error.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-
-  /department/renew-token:
-    get:
-      tags:
-        - Department Onboarding
-      summary: Renew department access token
-      description: Renew access token using the refresh token stored in cookies.
-      responses:
-        '200':
-          description: Token renewed successfully.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/SuccessResponse'
-        '401':
-          description: Unauthorized. Missing or invalid refresh token.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '500':
-          description: Internal server error.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-
-  /department/logout:
-    put:
-      tags:
-        - Department Onboarding
-      summary: Log out department
-      description: Log out department and clear tokens.
-      responses:
-        '200':
-          description: Logged out successfully.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/SuccessResponse'
-        '500':
-          description: Internal server error.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
 
   /practitioner/register:
     post:
       tags:
         - Practitioner Management
-      summary: Register a practitioner
-      description: Register a new practitioner using a pre-authorized 7-day expiring referral code generated by a department.
+      summary: Register a doctor (Optional Practitioner Registration)
+      description: Public registration for medical practitioners using their MDCN number. Registration defaults to pending status until manually verified by an Administrator through the MDCN portal.
       requestBody:
         required: true
         content:
@@ -1817,19 +1163,13 @@ paths:
               $ref: '#/components/schemas/PractitionerRegister'
       responses:
         '201':
-          description: Practitioner registered successfully in approved status.
+          description: Doctor registration submitted successfully in pending status.
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/SuccessResponse'
         '400':
-          description: Validation error, invalid/expired referral code, or username already taken.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '404':
-          description: Department associated with referral code not found.
+          description: Validation error or username already taken.
           content:
             application/json:
               schema:
@@ -1929,8 +1269,8 @@ paths:
     put:
       tags:
         - Practitioner Management
-      summary: Approve practitioner registration (HOD only)
-      description: HOD approves a pending practitioner under their department.
+      summary: Approve doctor registration (Admin only)
+      description: Administrator approves a pending doctor account after manual verification on the MDCN portal.
       security:
         - AccessTokenAuth: []
       requestBody:
@@ -1953,7 +1293,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
         '403':
-          description: Forbidden. HOD privileges required.
+          description: Forbidden. Administrator privileges required.
           content:
             application/json:
               schema:
@@ -1975,8 +1315,8 @@ paths:
     put:
       tags:
         - Practitioner Management
-      summary: Reject practitioner registration (HOD only)
-      description: HOD rejects a pending practitioner registration.
+      summary: Reject doctor registration (Admin only)
+      description: Administrator rejects a pending doctor registration.
       security:
         - AccessTokenAuth: []
       requestBody:
@@ -1999,7 +1339,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
         '403':
-          description: Forbidden. HOD privileges required.
+          description: Forbidden. Administrator privileges required.
           content:
             application/json:
               schema:
@@ -2021,8 +1361,8 @@ paths:
     get:
       tags:
         - Practitioner Management
-      summary: Fetch practitioners under HOD's department (HOD only)
-      description: Retrieve a list of practitioners in the same department as the HOD.
+      summary: Fetch doctors for verification review (Admin only)
+      description: Retrieve a list of registered doctors filtered by status or MDCN number for Admin verification.
       security:
         - AccessTokenAuth: []
       parameters:
@@ -2037,6 +1377,11 @@ paths:
           schema:
             type: string
             enum: [pending, approved, rejected]
+        - name: mdcnNumber
+          in: query
+          required: false
+          schema:
+            type: string
         - name: specialization
           in: query
           required: false
@@ -2058,7 +1403,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
         '403':
-          description: Forbidden. HOD credentials required.
+          description: Forbidden. Administrator credentials required.
           content:
             application/json:
               schema:
@@ -2074,8 +1419,8 @@ paths:
     delete:
       tags:
         - Practitioner Management
-      summary: Delete practitioner from department (HOD only, cannot delete HOD)
-      description: HOD deletes a practitioner record under their department.
+      summary: Delete practitioner account (Admin only)
+      description: Administrator deletes a practitioner record.
       security:
         - AccessTokenAuth: []
       parameters:
@@ -2092,8 +1437,20 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/SuccessResponse'
-        '400':
-          description: HOD cannot delete themselves.
+        '401':
+          description: Unauthorized.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden. Administrator credentials required.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error.
           content:
             application/json:
               schema:
@@ -3327,117 +2684,17 @@ components:
           example: "2026-08-16T03:00:00.000Z"
 
     DepartmentRegister:
-      type: object
-      required: [departmentName, username, password, phone, description, email, organization_id, referralCode]
-      properties:
-        departmentName:
-          type: string
-          example: Pediatrics
-        username:
-          type: string
-          example: peds_dept
-        password:
-          type: string
-          example: peds_pass_123
-        phone:
-          type: string
-          example: "2348011111111"
-        description:
-          type: string
-          example: Department specializing in pediatric care.
-        email:
-          type: string
-          format: email
-          example: peds@cityhospital.com
-        organization_id:
-          type: string
-          format: uuid
-          example: "9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d"
-        referralCode:
-          type: string
-          example: "REF-ORG-A1B2C3D4"
-
-    DepartmentRegisterResponse:
-      type: object
-      properties:
-        message:
-          type: string
-          example: Department registered successfully
-        department:
-          $ref: '#/components/schemas/Department'
-
-    DepartmentApprove:
-      type: object
-      required: [department_id]
-      properties:
-        department_id:
-          type: string
-          format: uuid
-          example: "9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d"
-
-    Department:
-      type: object
-      properties:
-        id:
-          type: string
-          format: uuid
-        organization_id:
-          type: string
-          format: uuid
-        departmentName:
-          type: string
-        username:
-          type: string
-        description:
-          type: string
-        phone:
-          type: string
-        email:
-          type: string
-          format: email
-        headOfDepartmentId:
-          type: string
-          format: uuid
-          nullable: true
-        status:
-          type: string
-          enum: [pending, approved]
-        createdAt:
-          type: string
-          format: date-time
-        updatedAt:
-          type: string
-          format: date-time
-
     PractitionerRegister:
       type: object
       required:
-        - organization_id
-        - job
-        - staffId
+        - mdcnNumber
         - email
         - phone
         - username
         - firstName
         - lastName
         - password
-        - referralCode
       properties:
-        organization_id:
-          type: string
-          format: uuid
-          example: "9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d"
-        department_id:
-          type: string
-          format: uuid
-          example: "8b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d"
-        job:
-          type: string
-          enum: [doctor, nurse, lab_technician, pharmacist, hod]
-          example: doctor
-        staffId:
-          type: string
-          example: "ST-098"
         mdcnNumber:
           type: string
           example: "MDCN-44321"
@@ -3461,9 +2718,6 @@ components:
         username:
           type: string
           example: dr_adewale
-        referralCode:
-          type: string
-          example: "REF-DEPT-B2C3D4E5"
         specialization:
           type: string
           example: Pediatric Surgery
@@ -3474,78 +2728,6 @@ components:
           type: string
           enum: [full_time, part_time, locum, intern, volunteer]
           example: full_time
-        joinedAt:
-          type: string
-          format: date
-          example: "2023-01-15"
-
-    PractitionerLogin:
-      type: object
-      required: [username, password]
-      properties:
-        username:
-          type: string
-          example: dr_adewale
-        password:
-          type: string
-          example: securepass123
-
-    Practitioner:
-      type: object
-      properties:
-        id:
-          type: string
-          format: uuid
-        organization_id:
-          type: string
-          format: uuid
-        department_id:
-          type: string
-          format: uuid
-          nullable: true
-        job:
-          type: string
-          enum: [doctor, nurse, lab_technician, pharmacist, hod]
-        staffId:
-          type: string
-        mdcnNumber:
-          type: string
-        firstName:
-          type: string
-        lastName:
-          type: string
-        email:
-          type: string
-          format: email
-        phone:
-          type: string
-        username:
-          type: string
-        specialization:
-          type: string
-        qualification:
-          type: string
-        employmentStatus:
-          type: string
-          enum: [full_time, part_time, locum, intern, volunteer]
-        joinedAt:
-          type: string
-          format: date
-        leftAt:
-          type: string
-          format: date
-          nullable: true
-        status:
-          type: string
-          enum: [approved, pending, rejected]
-        createdAt:
-          type: string
-          format: date-time
-        updatedAt:
-          type: string
-          format: date-time
-
-    DepartmentLogin:
       type: object
       required: [username, password]
       properties:

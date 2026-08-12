@@ -78,10 +78,12 @@ class PractitionerController {
 
     async approve(req, res) {
         try {
-            // Protected: HOD only (HOD practitioner ID in req.user.id)
-            const hodId = req.user.id;
+            // Protected: Admin only
             const { practitioner_id } = req.body;
-            const message = await practitionerServices.approvePractitioner(hodId, practitioner_id);
+            if (!practitioner_id) {
+                return res.status(400).json({ error: 'practitioner_id is required.' });
+            }
+            const message = await practitionerServices.approvePractitioner(practitioner_id);
             return res.status(200).json({ message });
         } catch (error) {
             console.error('Practitioner approve controller error:', error);
@@ -91,10 +93,12 @@ class PractitionerController {
 
     async reject(req, res) {
         try {
-            // Protected: HOD only (HOD practitioner ID in req.user.id)
-            const hodId = req.user.id;
+            // Protected: Admin only
             const { practitioner_id } = req.body;
-            const message = await practitionerServices.rejectPractitioner(hodId, practitioner_id);
+            if (!practitioner_id) {
+                return res.status(400).json({ error: 'practitioner_id is required.' });
+            }
+            const message = await practitionerServices.rejectPractitioner(practitioner_id);
             return res.status(200).json({ message });
         } catch (error) {
             console.error('Practitioner reject controller error:', error);
@@ -104,14 +108,14 @@ class PractitionerController {
 
     async fetch(req, res) {
         try {
-            // Protected: HOD only (HOD practitioner ID in req.user.id)
-            const hodId = req.user.id;
+            // Protected: Admin only
             const filters = {
                 job: req.query.job,
                 status: req.query.status,
-                specialization: req.query.specialization
+                specialization: req.query.specialization,
+                mdcnNumber: req.query.mdcnNumber
             };
-            const practitioners = await practitionerServices.fetchPractitioners(hodId, filters);
+            const practitioners = await practitionerServices.fetchPractitioners(filters);
             return res.status(200).json(practitioners);
         } catch (error) {
             console.error('Practitioner fetch controller error:', error);
@@ -121,15 +125,14 @@ class PractitionerController {
 
     async deletePrac(req, res) {
         try {
-            // Protected: HOD only (HOD practitioner ID in req.user.id)
-            const hodId = req.user.id;
+            // Protected: Admin only
             const practitionerId = req.body.practitioner_id || req.query.practitioner_id;
 
             if (!practitionerId) {
                 return res.status(400).json({ error: 'practitioner_id is required.' });
             }
 
-            const message = await practitionerServices.deletePractitioner(hodId, practitionerId);
+            const message = await practitionerServices.deletePractitioner(practitionerId);
             return res.status(200).json({ message });
         } catch (error) {
             console.error('Practitioner delete controller error:', error);

@@ -1,7 +1,5 @@
 import { verifyAccessToken, verifyPasswordResetToken } from '../../services/tokenServices/token.js';
 import Practitioner from '../../practitioner/practitionerModel.js';
-import Organization from '../../organization/organizationModel.js';
-import Department from '../../department/departmentModel.js';
 
 /**
  * Middleware to authenticate requests using JWT access token stored in cookies.
@@ -61,61 +59,6 @@ export function authenticateAdmin(req, res, next) {
 }
 
 /**
- * Middleware to verify the logged-in entity is an active Organization.
- */
-export async function authenticateOrganization(req, res, next) {
-    const token = req.cookies.access_token;
-
-    if (!token) {
-        return res.status(401).json({ error: 'Access token is missing.' });
-    }
-
-    const decoded = verifyAccessToken(token);
-    if (!decoded || decoded.role !== 'organization') {
-        return res.status(403).json({ error: 'Access denied. Organization credentials required.' });
-    }
-
-    // Verify Organization is still active in DB
-    try {
-        const org = await Organization.findByPk(decoded.id);
-        if (!org || org.status !== 'active') {
-            return res.status(403).json({ error: 'Organization is not active or has been suspended.' });
-        }
-        req.user = decoded;
-        next();
-    } catch (err) {
-        return res.status(500).json({ error: 'Internal server error during authentication.' });
-    }
-}
-
-/**
- * Middleware to verify the logged-in entity is an approved Department.
- */
-export async function authenticateDepartment(req, res, next) {
-    const token = req.cookies.access_token;
-
-    if (!token) {
-        return res.status(401).json({ error: 'Access token is missing.' });
-    }
-
-    const decoded = verifyAccessToken(token);
-    if (!decoded || decoded.role !== 'department') {
-        return res.status(403).json({ error: 'Access denied. Department credentials required.' });
-    }
-
-    try {
-        const dept = await Department.findByPk(decoded.id);
-        if (!dept || dept.status !== 'approved') {
-            return res.status(403).json({ error: 'Department is not approved or is inactive.' });
-        }
-        req.user = decoded;
-        next();
-    } catch (err) {
-        return res.status(500).json({ error: 'Internal server error during authentication.' });
-    }
-}
-
-/**
  * Middleware to verify the logged-in entity is an approved Practitioner.
  */
 export async function authenticatePractitioner(req, res, next) {
@@ -137,71 +80,6 @@ export async function authenticatePractitioner(req, res, next) {
         }
         req.user = decoded;
         next();
-    } catch (err) {
-        return res.status(500).json({ error: 'Internal server error during authentication.' });
-    }
-}
-
-/**
- * Middleware to verify the logged-in practitioner is an approved Head of Department (HOD).
- */
-export async function authenticateHOD(req, res, next) {
-    const token = req.cookies.access_token;
-
-    if (!token) {
-        return res.status(401).json({ error: 'Access token is missing.' });
-    }
-
-    const decoded = verifyAccessToken(token);
-    if (!decoded || decoded.role !== 'practitioner') {
-        return res.status(403).json({ error: 'Access denied. Practitioner credentials required.' });
-    }
-
-    try {
-        const prac = await Practitioner.findByPk(decoded.id);
-        if (!prac || prac.job !== 'hod' || prac.status !== 'approved') {
-            return res.status(403).json({ error: 'Access denied. Only approved Heads of Department (HOD) are authorized.' });
-        }
-        req.user = decoded;
-        next();
-    } catch (err) {
-        return res.status(500).json({ error: 'Internal server error during authentication.' });
-    }
-}
-
-/**
- * Middleware to verify the request comes from either an approved Department or an approved HOD Practitioner.
- */
-export async function authenticateDepartmentOrHOD(req, res, next) {
-    const token = req.cookies.access_token;
-
-    if (!token) {
-        return res.status(401).json({ error: 'Access token is missing.' });
-    }
-
-    const decoded = verifyAccessToken(token);
-    if (!decoded) {
-        return res.status(401).json({ error: 'Invalid or expired access token.' });
-    }
-
-    try {
-        if (decoded.role === 'department') {
-            const dept = await Department.findByPk(decoded.id);
-            if (!dept || dept.status !== 'approved') {
-                return res.status(403).json({ error: 'Department is not approved or is inactive.' });
-            }
-            req.user = decoded;
-            return next();
-        } else if (decoded.role === 'practitioner') {
-            const prac = await Practitioner.findByPk(decoded.id);
-            if (!prac || prac.job !== 'hod' || prac.status !== 'approved') {
-                return res.status(403).json({ error: 'Access denied. Only approved Heads of Department (HOD) are authorized.' });
-            }
-            req.user = decoded;
-            return next();
-        } else {
-            return res.status(403).json({ error: 'Access denied. Department or HOD credentials required.' });
-        }
     } catch (err) {
         return res.status(500).json({ error: 'Internal server error during authentication.' });
     }

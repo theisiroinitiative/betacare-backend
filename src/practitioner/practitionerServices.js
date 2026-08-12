@@ -2,46 +2,14 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { Op } from 'sequelize';
 import Practitioner from './practitionerModel.js';
-import Department from '../department/departmentModel.js';
 import emailService from '../services/emailServices/emailService.js';
 import redisClient from '../config/redisConfig.js';
-import Referral from '../schedule/referrals/referralModel.js';
 
 const JWT_ACCESS_SECRET = process.env.JWT_ACCESS_SECRET || 'your_jwt_access_secret';
 const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || 'your_jwt_refresh_secret';
 
 class PractitionerServices {
     async registerPractitioner(data) {
-        // Validate referral code
-        const referral = await Referral.findOne({
-            where: {
-                referralCode: data.referralCode,
-                referrerType: 'department',
-                status: 'fresh',
-                deleteAt: { [Op.gt]: new Date() }
-            }
-        });
-
-        if (!referral) {
-            const err = new Error('Invalid or expired referral code.');
-            err.statusCode = 400;
-            throw err;
-        }
-
-        // Validate department associated with referral code
-        const department = await Department.findByPk(referral.referrerid);
-        if (!department) {
-            const err = new Error('Department associated with this referral code was not found.');
-            err.statusCode = 404;
-            throw err;
-        }
-
-        if (data.department_id && data.department_id !== department.id) {
-            const err = new Error('Referral code does not match the specified department.');
-            err.statusCode = 400;
-            throw err;
-        }
-
         // Check unique username
         const existingUsername = await Practitioner.findOne({ where: { username: data.username } });
         if (existingUsername) {
@@ -54,25 +22,14 @@ class PractitionerServices {
         const salt = await bcrypt.genSalt(10);
         const hashedPassword = await bcrypt.hash(data.password, salt);
 
-        // Create practitioner in approved status (pre-authorized via referral code)
+        // Create practitioner in pending status for manual Admin MDCN verification
         const practitioner = await Practitioner.create({
             ...data,
-            department_id: department.id,
-            organization_id: department.organization_id,
             password: hashedPassword,
-            status: 'approved'
+            status: 'pending'
         });
 
-        if (data.job === 'hod' && !department.headOfDepartmentId) {
-            department.headOfDepartmentId = practitioner.id;
-            await department.save();
-        }
-
-        // Mark referral code as used
-        referral.status = 'used';
-        await referral.save();
-
-        return 'practitioner registered successfully';
+        return 'Doctor registration submitted successfully. Your account is pending manual MDCN verification by an administrator.';
     }
 
     async login({ username, password }) {
@@ -152,20 +109,10 @@ class PractitionerServices {
         return 'logout successfully';
     }
 
-    async approvePractitioner(hodId, pracId) {
-        // Fetch the department where this practitioner is HOD
-        const department = await Department.findOne({ where: { headOfDepartmentId: hodId } });
-        if (!department) {
-            const err = new Error('HOD department not found.');
-            err.statusCode = 404;
-            throw err;
-        }
-
-        const practitioner = await Practitioner.findOne({
-            where: { id: pracId, department_id: department.id }
-        });
+    async approvePractitioner(pracId) {
+        const practitioner = await Practitioner.findByPk(pracId);
         if (!practitioner) {
-            const err = new Error('Practitioner not found under your department.');
+            const err = new Error('Practitioner not found.');
             err.statusCode = 404;
             throw err;
         }
@@ -173,22 +120,21 @@ class PractitionerServices {
         practitioner.status = 'approved';
         await practitioner.save();
 
+        await emailService.sendEmail({
+            to: practitioner.email,
+            subject: 'BetaCare Doctor Verification Approved',
+            html: `<p>Hello Dr. ${practitioner.lastName},</p>
+                   <p>Your doctor account has been verified via MDCN and approved by the platform administrator!</p>
+                   <p>You can now log in to access linked patient health records.</p>`
+        });
+
         return 'practitioner approved successfully';
     }
 
-    async rejectPractitioner(hodId, pracId) {
-        const department = await Department.findOne({ where: { headOfDepartmentId: hodId } });
-        if (!department) {
-            const err = new Error('HOD department not found.');
-            err.statusCode = 404;
-            throw err;
-        }
-
-        const practitioner = await Practitioner.findOne({
-            where: { id: pracId, department_id: department.id }
-        });
+    async rejectPractitioner(pracId) {
+        const practitioner = await Practitioner.findByPk(pracId);
         if (!practitioner) {
-            const err = new Error('Practitioner not found under your department.');
+            const err = new Error('Practitioner not found.');
             err.statusCode = 404;
             throw err;
         }
@@ -199,18 +145,12 @@ class PractitionerServices {
         return 'practitioner rejected successfully';
     }
 
-    async fetchPractitioners(hodId, filters = {}) {
-        const department = await Department.findOne({ where: { headOfDepartmentId: hodId } });
-        if (!department) {
-            const err = new Error('HOD department not found.');
-            err.statusCode = 404;
-            throw err;
-        }
-
-        const where = { department_id: department.id };
+    async fetchPractitioners(filters = {}) {
+        const where = {};
         if (filters.job) where.job = filters.job;
         if (filters.status) where.status = filters.status;
         if (filters.specialization) where.specialization = filters.specialization;
+        if (filters.mdcnNumber) where.mdcnNumber = filters.mdcnNumber;
 
         return await Practitioner.findAll({
             where,
@@ -219,25 +159,10 @@ class PractitionerServices {
         });
     }
 
-    async deletePractitioner(hodId, pracId) {
-        if (hodId === pracId) {
-            const err = new Error('Deletion of practitioner failed. The practitioner is the HOD.');
-            err.statusCode = 400;
-            throw err;
-        }
-
-        const department = await Department.findOne({ where: { headOfDepartmentId: hodId } });
-        if (!department) {
-            const err = new Error('HOD department not found.');
-            err.statusCode = 404;
-            throw err;
-        }
-
-        const practitioner = await Practitioner.findOne({
-            where: { id: pracId, department_id: department.id }
-        });
+    async deletePractitioner(pracId) {
+        const practitioner = await Practitioner.findByPk(pracId);
         if (!practitioner) {
-            const err = new Error('Practitioner not found under your department.');
+            const err = new Error('Practitioner not found.');
             err.statusCode = 404;
             throw err;
         }

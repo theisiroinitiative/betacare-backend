@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import practitionerController from './practitionerController.js';
 import {
-    authenticateHOD,
+    authenticateAdmin,
     authenticatePractitioner
 } from '../utils/middleware/authMiddleware.js';
 import {
@@ -15,11 +15,11 @@ router.post('/register', validatePractitionerRegister, practitionerController.re
 router.post('/login', practitionerController.login);
 router.put('/logout', practitionerController.logout);
 
-// Protected routes (HOD only)
-router.put('/approve-practitioner', authenticateHOD, practitionerController.approve);
-router.put('/reject-practitioner', authenticateHOD, practitionerController.reject);
-router.get('/fetch', authenticateHOD, practitionerController.fetch);
-router.delete('/delete', authenticateHOD, practitionerController.deletePrac);
+// Admin-protected doctor verification routes
+router.put('/approve-practitioner', authenticateAdmin, practitionerController.approve);
+router.put('/reject-practitioner', authenticateAdmin, practitionerController.reject);
+router.get('/fetch', authenticateAdmin, practitionerController.fetch);
+router.delete('/delete', authenticateAdmin, practitionerController.deletePrac);
 router.get('/renew-token', practitionerController.renewToken); // Verified via refresh token cookie
 
 // Practitioner Patient Access (Practitioners only)

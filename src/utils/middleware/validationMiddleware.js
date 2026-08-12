@@ -59,65 +59,18 @@ export function validateLogin(req, res, next) {
     next();
 }
 
-// Integration System validators
-export function validateOrgRegister(req, res, next) {
-    const { name, type, ownership, email, description, phone, address, state, lga, registrationNumber } = req.body;
-    if (!name || name.trim() === '') return res.status(400).json({ error: 'name is required.' });
-    if (!type || type.trim() === '') return res.status(400).json({ error: 'type is required.' });
-    if (!ownership || ownership.trim() === '') return res.status(400).json({ error: 'ownership is required.' });
-    if (!email || !emailRegex.test(email)) return res.status(400).json({ error: 'A valid email is required.' });
-    if (!description || description.trim() === '') return res.status(400).json({ error: 'description is required.' });
-    if (!phone || phone.trim() === '') return res.status(400).json({ error: 'phone is required.' });
-    if (!address || address.trim() === '') return res.status(400).json({ error: 'address is required.' });
-    if (!state || state.trim() === '') return res.status(400).json({ error: 'state is required.' });
-    if (!lga || lga.trim() === '') return res.status(400).json({ error: 'lga is required.' });
-    if (!registrationNumber || registrationNumber.trim() === '') return res.status(400).json({ error: 'registrationNumber is required.' });
-    next();
-}
-
-export function validateOrgLogin(req, res, next) {
-    const { username, password } = req.body;
-    if (!username || username.trim() === '') return res.status(400).json({ error: 'username is required.' });
-    if (!password || password.trim() === '') return res.status(400).json({ error: 'password is required.' });
-    next();
-}
-
-export function validateGenerateReferral(req, res, next) {
-    const { name, email } = req.body;
-    if (!name || typeof name !== 'string' || name.trim() === '') {
-        return res.status(400).json({ error: 'name is required.' });
-    }
-    if (!email || !emailRegex.test(email)) {
-        return res.status(400).json({ error: 'A valid email is required.' });
-    }
-    next();
-}
-
-export function validateDeptRegister(req, res, next) {
-    const { departmentName, username, password, phone, description, email, organization_id, referralCode } = req.body;
-    if (!departmentName || departmentName.trim() === '') return res.status(400).json({ error: 'departmentName is required.' });
-    if (!username || username.trim() === '') return res.status(400).json({ error: 'username is required.' });
-    if (!password || password.trim() === '') return res.status(400).json({ error: 'password is required.' });
-    if (!phone || phone.trim() === '') return res.status(400).json({ error: 'phone is required.' });
-    if (!description || description.trim() === '') return res.status(400).json({ error: 'description is required.' });
-    if (!email || !emailRegex.test(email)) return res.status(400).json({ error: 'A valid email is required.' });
-    if (!organization_id || organization_id.trim() === '') return res.status(400).json({ error: 'organization_id is required.' });
-    if (!referralCode || referralCode.trim() === '') return res.status(400).json({ error: 'referralCode is required.' });
-    next();
-}
-
+// Practitioner Doctor Registration validator
 export function validatePractitionerRegister(req, res, next) {
-    const { organization_id, job, staffId, email, phone, username, firstName, lastName, password, referralCode } = req.body;
-    if (!referralCode || referralCode.trim() === '') return res.status(400).json({ error: 'referralCode is required.' });
-    if (!organization_id) return res.status(400).json({ error: 'organization_id is required.' });
-    if (!job) return res.status(400).json({ error: 'job is required.' });
-    if (!staffId) return res.status(400).json({ error: 'staffId is required.' });
+    const { email, phone, username, firstName, lastName, password, mdcnNumber } = req.body;
+    if (!mdcnNumber || typeof mdcnNumber !== 'string' || mdcnNumber.trim() === '') {
+        return res.status(400).json({ error: 'mdcnNumber is required for doctor registration.' });
+    }
     if (!email || !emailRegex.test(email)) return res.status(400).json({ error: 'A valid email is required.' });
-    if (!phone) return res.status(400).json({ error: 'phone is required.' });
-    if (!username) return res.status(400).json({ error: 'username is required.' });
-    if (!firstName) return res.status(400).json({ error: 'firstName is required.' });
-    if (!lastName) return res.status(400).json({ error: 'lastName is required.' });
-    if (!password || password.length < 6) return res.status(400).json({ error: 'password is required and must be at least 6 characters.' });
+    if (!phone || typeof phone !== 'string' || phone.trim() === '') return res.status(400).json({ error: 'phone is required.' });
+    if (!username || typeof username !== 'string' || username.trim() === '') return res.status(400).json({ error: 'username is required.' });
+    if (!firstName || typeof firstName !== 'string' || firstName.trim() === '') return res.status(400).json({ error: 'firstName is required.' });
+    if (!lastName || typeof lastName !== 'string' || lastName.trim() === '') return res.status(400).json({ error: 'lastName is required.' });
+    if (!password || typeof password !== 'string' || password.length < 6) return res.status(400).json({ error: 'password is required and must be at least 6 characters.' });
     next();
 }
 

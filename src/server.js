@@ -14,8 +14,6 @@ import sequelize from './config/dbConfig.js';
 import UserAuth from './auth/authModel.js';
 import Token from './services/tokenServices/tokenModel.js';
 import User from './config/users/userModel.js';
-import Organization from './organization/organizationModel.js';
-import Department from './department/departmentModel.js';
 import Practitioner from './practitioner/practitionerModel.js';
 import UserProfile from './profiles/healthProfiles/healthModel.js';
 import Condition from './profiles/conditions/conditionModel.js';
@@ -26,14 +24,10 @@ import WhatsAppJidMapping from './auth/whatsapp-auth/whatsappMappingModel.js';
 import Observation from './profiles/observation/observationModel.js';
 import Reminder from './schedule/reminderModel.js';
 import { startReminderScheduler } from './schedule/reminderScheduler.js';
-import Referral from './schedule/referrals/referralModel.js';
-import { startReferralScheduler } from './schedule/referrals/referralScheduler.js';
 import whatsappBotService from './agent/agentServices.js';
 
 // Import routers
 import authRoutes from './auth/authRoutes.js';
-import organizationRoutes from './organization/organizationRoutes.js';
-import departmentRoutes from './department/departmentRoutes.js';
 import practitionerRoutes from './practitioner/practitionerRoutes.js';
 import healthRoutes from './profiles/healthProfiles/healthRoutes.js';
 
@@ -58,8 +52,6 @@ app.use(express.urlencoded({ extended: true }));
 // Serve API routes
 app.use('/auth', authRoutes);
 app.use('/auth/user/profile', healthRoutes); // Stage 2 onboarding route
-app.use('/organization', organizationRoutes);
-app.use('/department', departmentRoutes);
 app.use('/practitioner', practitionerRoutes);
 
 // Load Swagger document
@@ -72,54 +64,35 @@ try {
 }
 
 // Set up model associations
-// 1. Organization & Department
-Organization.hasMany(Department, { foreignKey: 'organization_id', onDelete: 'CASCADE' });
-Department.belongsTo(Organization, { foreignKey: 'organization_id' });
-
-// 2. Organization & Practitioner
-Organization.hasMany(Practitioner, { foreignKey: 'organization_id', onDelete: 'CASCADE' });
-Practitioner.belongsTo(Organization, { foreignKey: 'organization_id' });
-
-// 3. Department & Practitioner
-Department.hasMany(Practitioner, { foreignKey: 'department_id', onDelete: 'SET NULL' });
-Practitioner.belongsTo(Department, { foreignKey: 'department_id' });
-
-// 4. Department HOD
-Department.belongsTo(Practitioner, { as: 'HOD', foreignKey: 'headOfDepartmentId', constraints: false });
-
-// 5. Admin User & Organization
-User.hasMany(Organization, { foreignKey: 'verifiedBy', onDelete: 'SET NULL' });
-Organization.belongsTo(User, { foreignKey: 'verifiedBy', as: 'verifier', constraints: false });
-
-// 6. UserAuth & UserProfile
+// 1. UserAuth & UserProfile
 UserAuth.hasOne(UserProfile, { foreignKey: 'userId', onDelete: 'CASCADE' });
 UserProfile.belongsTo(UserAuth, { foreignKey: 'userId' });
 
-// 7. UserProfile & Condition
+// 2. UserProfile & Condition
 UserProfile.hasMany(Condition, { foreignKey: 'profileId', onDelete: 'CASCADE' });
 Condition.belongsTo(UserProfile, { foreignKey: 'profileId' });
 
-// 8. UserProfile & Medication
+// 3. UserProfile & Medication
 UserProfile.hasMany(Medication, { foreignKey: 'profileId', onDelete: 'CASCADE' });
 Medication.belongsTo(UserProfile, { foreignKey: 'profileId' });
 
-// 9. Medication & MedicationLog
+// 4. Medication & MedicationLog
 Medication.hasMany(MedicationLog, { foreignKey: 'medicationId', onDelete: 'CASCADE' });
 MedicationLog.belongsTo(Medication, { foreignKey: 'medicationId' });
 
-// 10. UserProfile & VitalLog
+// 5. UserProfile & VitalLog
 UserProfile.hasMany(VitalLog, { foreignKey: 'profileId', onDelete: 'CASCADE' });
 VitalLog.belongsTo(UserProfile, { foreignKey: 'profileId' });
 
-// 11. UserAuth & WhatsApp JID Mapping
+// 6. UserAuth & WhatsApp JID Mapping
 UserAuth.hasOne(WhatsAppJidMapping, { foreignKey: 'phoneNumber', sourceKey: 'phoneNumber', onDelete: 'CASCADE' });
 WhatsAppJidMapping.belongsTo(UserAuth, { foreignKey: 'phoneNumber', targetKey: 'phoneNumber' });
 
-// 12. UserProfile & Observation
+// 7. UserProfile & Observation
 UserProfile.hasMany(Observation, { foreignKey: 'profileId', onDelete: 'CASCADE' });
 Observation.belongsTo(UserProfile, { foreignKey: 'profileId' });
 
-// 13. UserProfile & Reminder
+// 8. UserProfile & Reminder
 UserProfile.hasMany(Reminder, { foreignKey: 'profileId', onDelete: 'CASCADE' });
 Reminder.belongsTo(UserProfile, { foreignKey: 'profileId' });
 
@@ -133,9 +106,8 @@ async function initializeDatabase() {
         await sequelize.sync({ force: false });
         console.log('Database models synchronized successfully.');
 
-        // Start the reminder & referral schedulers after DB is ready
+        // Start the reminder scheduler after DB is ready
         startReminderScheduler();
-        startReferralScheduler();
 
         // Initialize WhatsApp bot service
         await whatsappBotService.init();

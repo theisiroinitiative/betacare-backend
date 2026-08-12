@@ -7,33 +7,17 @@ const Practitioner = sequelize.define('Practitioner', {
         defaultValue: DataTypes.UUIDV4,
         primaryKey: true
     },
-    organization_id: {
-        type: DataTypes.UUID,
-        allowNull: false,
-        references: {
-            model: 'organizations',
-            key: 'id'
-        },
-        onDelete: 'CASCADE'
-    },
-    department_id: {
-        type: DataTypes.UUID,
-        allowNull: true,
-        references: {
-            model: 'departments',
-            key: 'id'
-        },
-        onDelete: 'SET NULL'
-    },
     job: {
         type: DataTypes.ENUM('doctor', 'nurse', 'lab_technician', 'pharmacist', 'hod'),
+        defaultValue: 'doctor',
         allowNull: false
     },
     staffId: {
         type: DataTypes.STRING(50)
     },
     mdcnNumber: {
-        type: DataTypes.STRING(50)
+        type: DataTypes.STRING(50),
+        allowNull: false
     },
     firstName: {
         type: DataTypes.STRING(255)
