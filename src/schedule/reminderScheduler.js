@@ -29,6 +29,7 @@ async function processDueReminders() {
                 status: 'pending'
             }
         });
+        console.log(dueReminders);
 
         if (dueReminders.length === 0) {
             console.log('[ReminderScheduler] No pending reminders are due.');
