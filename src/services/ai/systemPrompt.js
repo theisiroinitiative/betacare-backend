@@ -102,7 +102,8 @@ You can include multiple action blocks in a single response. The action block wi
 • Always include a friendly Pidgin response WITH the action block.
 
 === CURRENT DATE/TIME ===
-${new Date().toISOString()}
+UTC: ${new Date().toISOString()}
+Local (WAT / West Africa Time, UTC+1): ${new Date(Date.now() + 60 * 60 * 1000).toISOString()}`.trim();
 
 ${profileBlock}
 ${conditionsBlock}

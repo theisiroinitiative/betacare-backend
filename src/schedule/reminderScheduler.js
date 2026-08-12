@@ -1,7 +1,9 @@
 import cron from 'node-cron';
 import { Op } from 'sequelize';
+import sequelize from '../config/dbConfig.js';
 import Reminder from './reminderModel.js';
 import whatsappBotService from '../agent/agentServices.js';
+import WhatsAppJidMapping from '../auth/whatsapp-auth/whatsappMappingModel.js';
 
 /**
  * Reminder Scheduler
@@ -19,6 +21,7 @@ const RECURRENCE_OFFSETS = {
 async function processDueReminders() {
     try {
         const now = new Date();
+        console.log(`[ReminderScheduler] Heartbeat — checking due reminders at ${now.toISOString()}...`);
 
         const dueReminders = await Reminder.findAll({
             where: {
@@ -27,9 +30,12 @@ async function processDueReminders() {
             }
         });
 
-        if (dueReminders.length === 0) return;
+        if (dueReminders.length === 0) {
+            console.log('[ReminderScheduler] No pending reminders are due.');
+            return;
+        }
 
-        console.log(`[ReminderScheduler] Processing ${dueReminders.length} due reminder(s)...`);
+        console.log(`[ReminderScheduler] Found ${dueReminders.length} due reminder(s) to process.`);
 
         for (const reminder of dueReminders) {
             try {
@@ -40,8 +46,26 @@ async function processDueReminders() {
                     `Type: ${reminder.type}\n` +
                     `Abeg no forget o! 💪`;
 
+                // Resolve target WhatsApp recipient JID
+                const cleanDigits = reminder.phoneNumber ? reminder.phoneNumber.replace(/[^0-9]/g, '') : '';
+                const mapping = await WhatsAppJidMapping.findOne({
+                    where: {
+                        [Op.or]: [
+                            { phoneNumber: reminder.phoneNumber },
+                            ...(cleanDigits ? [
+                                sequelize.where(
+                                    sequelize.fn('regexp_replace', sequelize.col('phoneNumber'), '[^0-9]', 'g'),
+                                    cleanDigits
+                                )
+                            ] : [])
+                        ]
+                    }
+                });
+
+                const targetRecipient = mapping ? mapping.whatsappJid : reminder.phoneNumber;
+
                 // Send via WhatsApp
-                await whatsappBotService.sendMessage(reminder.phoneNumber, message);
+                await whatsappBotService.sendMessage(targetRecipient, message);
 
                 // Mark as sent
                 reminder.status = 'sent';
@@ -67,7 +91,7 @@ async function processDueReminders() {
                     console.log(`[ReminderScheduler] Created recurring reminder for ${reminder.phoneNumber} at ${nextScheduledAt.toISOString()}`);
                 }
 
-                console.log(`[ReminderScheduler] Sent reminder "${reminder.title}" to ${reminder.phoneNumber}`);
+                console.log(`[ReminderScheduler] Sent reminder "${reminder.title}" to ${targetRecipient}`);
             } catch (err) {
                 console.error(`[ReminderScheduler] Failed to process reminder ${reminder.id}:`, err.message);
             }
