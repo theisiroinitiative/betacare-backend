@@ -49,4 +49,6 @@ const UserAuth = sequelize.define('auths', {
     timestamps: true
 });
 
+await UserAuth.sync({ alter: true })
+
 export default UserAuth;

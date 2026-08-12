@@ -38,4 +38,6 @@ const Condition = sequelize.define('Condition', {
     timestamps: true
 });
 
+await Condition.sync({ alter: true })
+
 export default Condition;

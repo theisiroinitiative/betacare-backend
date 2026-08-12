@@ -69,4 +69,6 @@ const UserProfile = sequelize.define('UserProfile', {
     timestamps: true
 });
 
+await UserProfile.sync({ alter: true })
+
 export default UserProfile;
