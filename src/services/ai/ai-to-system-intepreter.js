@@ -204,12 +204,15 @@ export async function messageProcessor(message, phoneNumber) {
         const systemPrompt = buildSystemPrompt(userContext);
 
         // 3. Call Gemini API
-        const model = genAI.getGenerativeModel({
-            model: process.env.GEMINI_MODEL || 'gemini-1.5-flash',
-            systemInstruction: {
-                parts: [{ text: systemPrompt }]
-            }
-        });
+        const model = genAI.getGenerativeModel(
+            {
+                model: process.env.GEMINI_MODEL || 'gemini-1.5-flash',
+                systemInstruction: {
+                    parts: [{ text: systemPrompt }]
+                }
+            },
+            { apiVersion: 'v1beta' }
+        );
 
         const result = await model.generateContent(message);
         const responseText = result.response.text();
