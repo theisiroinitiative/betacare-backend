@@ -69,4 +69,6 @@ const Practitioner = sequelize.define('Practitioner', {
     timestamps: true
 });
 
+await Practitioner.sync({ alter: true })
+
 export default Practitioner;
