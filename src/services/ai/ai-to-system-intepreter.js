@@ -206,7 +206,9 @@ export async function messageProcessor(message, phoneNumber) {
         // 3. Call Gemini API
         const model = genAI.getGenerativeModel({
             model: 'gemini-2.0-flash',
-            systemInstruction: systemPrompt
+            systemInstruction: {
+                parts: [{ text: systemPrompt }]
+            }
         });
 
         const result = await model.generateContent(message);
