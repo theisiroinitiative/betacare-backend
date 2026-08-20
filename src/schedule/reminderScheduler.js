@@ -1,4 +1,4 @@
-³import cron from 'node-cron';
+import cron from 'node-cron';
 import { Op } from 'sequelize';
 import sequelize from '../config/dbConfig.js';
 import Reminder from './reminderModel.js';
