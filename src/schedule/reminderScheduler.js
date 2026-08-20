@@ -21,7 +21,7 @@ const RECURRENCE_OFFSETS = {
 async function processDueReminders() {
     try {
         const now = new Date();
-        console.log(`[ReminderScheduler] Heartbeat — checking due reminders at ${now.toISOString()}...`);
+        console.log(`[ReminderScheduler] Heartbeat: checking due reminders at ${now.toISOString()}...`);
 
         const dueReminders = await Reminder.findAll({
             where:{
